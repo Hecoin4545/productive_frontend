@@ -8,12 +8,15 @@ const pathColors = {
 };
 
 export default function LearningProgress({ paths }) {
-  const data = paths || [
+  const defaultData = [
     { title: 'Data Structures & Algorithms', progress: 78 },
     { title: 'Machine Learning', progress: 52 },
     { title: 'Web Development', progress: 64 },
     { title: 'System Design', progress: 31 },
   ];
+
+  // Ensure paths is always an array
+  const data = Array.isArray(paths) && paths.length > 0 ? paths : defaultData;
 
   return (
     <div className="card fade-in">

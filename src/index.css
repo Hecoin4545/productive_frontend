@@ -1517,3 +1517,47 @@ img {
 .stagger > *:nth-child(9) { animation-delay: 400ms; }
 .stagger > *:nth-child(10) { animation-delay: 450ms; }
 
+/* =================== */
+/* JOURNAL GRID        */
+/* =================== */
+.journal-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+}
+
+.journal-col-center {
+  order: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.journal-col-left {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.journal-col-right {
+  order: 3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+@media (min-width: 1024px) {
+  .journal-grid {
+    grid-template-columns: minmax(250px, 1fr) minmax(400px, 2fr) minmax(250px, 1fr);
+  }
+  .journal-col-left {
+    order: 1;
+  }
+  .journal-col-center {
+    order: 2;
+  }
+  .journal-col-right {
+    order: 3;
+  }
+}

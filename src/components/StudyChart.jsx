@@ -1,5 +1,5 @@
 export default function StudyChart({ weeklyData }) {
-  const data = weeklyData || [
+  const defaultData = [
     { day: 'Mon', hours: 2 },
     { day: 'Tue', hours: 4 },
     { day: 'Wed', hours: 3 },
@@ -8,6 +8,9 @@ export default function StudyChart({ weeklyData }) {
     { day: 'Sat', hours: 6 },
     { day: 'Sun', hours: 3 },
   ];
+
+  // Ensure weeklyData is always an array
+  const data = Array.isArray(weeklyData) && weeklyData.length > 0 ? weeklyData : defaultData;
 
   const maxHours = Math.max(...data.map(d => d.hours), 1);
   const todayIndex = new Date().getDay(); // 0=Sun, 1=Mon...

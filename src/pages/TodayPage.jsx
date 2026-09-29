@@ -105,7 +105,17 @@ export default function TodayPage() {
     try {
       const res = await getDashboardData();
       if (res.data?.success && res.data.data) {
-        setData(res.data.data);
+        // Ensure arrays are properly initialized
+        const apiData = res.data.data;
+        setData({
+          todos: Array.isArray(apiData.todos) ? apiData.todos : [],
+          goals: Array.isArray(apiData.goals) ? apiData.goals : [],
+          studySessions: Array.isArray(apiData.studySessions) ? apiData.studySessions : [],
+          learningPaths: Array.isArray(apiData.learningPaths) ? apiData.learningPaths : [],
+          journal: apiData.journal || null,
+          stats: apiData.stats || mockData.stats,
+          weeklyStudy: Array.isArray(apiData.weeklyStudy) ? apiData.weeklyStudy : mockData.weeklyStudy
+        });
       } else {
         setData(mockData);
       }
@@ -127,7 +137,9 @@ export default function TodayPage() {
 
   const d = data || mockData;
   const stats = d.stats || mockData.stats;
-  const currentPath = d.learningPaths?.[0] || mockData.learningPaths[0];
+  const currentPath = (Array.isArray(d.learningPaths) && d.learningPaths.length > 0)
+    ? d.learningPaths[0]
+    : mockData.learningPaths[0];
 
   return (
     <div className="stagger">
@@ -177,23 +189,23 @@ export default function TodayPage() {
       {/* Main Dashboard Grid */}
       <div className="dashboard-grid">
         {/* Left column: Todos */}
-        <TodoOverview todos={d.todos || mockData.todos} />
+        <TodoOverview todos={Array.isArray(d.todos) ? d.todos : mockData.todos} />
         {/* Right column: Focus */}
         <FocusCard learningPath={currentPath} />
       </div>
 
       <div className="dashboard-grid">
         {/* Left column: Study Activity */}
-        <StudyActivity sessions={d.studySessions || mockData.studySessions} />
+        <StudyActivity sessions={Array.isArray(d.studySessions) ? d.studySessions : mockData.studySessions} />
         {/* Right column: Weekly Chart */}
-        <StudyChart weeklyData={d.weeklyStudy || mockData.weeklyStudy} />
+        <StudyChart weeklyData={Array.isArray(d.weeklyStudy) ? d.weeklyStudy : mockData.weeklyStudy} />
       </div>
 
       <div className="dashboard-grid">
         {/* Left column: Learning Progress */}
-        <LearningProgress paths={d.learningPaths || mockData.learningPaths} />
+        <LearningProgress paths={Array.isArray(d.learningPaths) ? d.learningPaths : mockData.learningPaths} />
         {/* Right column: Goals */}
-        <GoalsOverview goals={d.goals || mockData.goals} />
+        <GoalsOverview goals={Array.isArray(d.goals) ? d.goals : mockData.goals} />
       </div>
 
       {/* Journal Preview - Full Width */}

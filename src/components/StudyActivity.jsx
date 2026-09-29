@@ -23,7 +23,8 @@ function formatDuration(minutes) {
 }
 
 export default function StudyActivity({ sessions }) {
-  const data = sessions || [];
+  // Ensure sessions is always an array
+  const data = Array.isArray(sessions) ? sessions : [];
 
   const totalMinutes = data.reduce((sum, s) => sum + (s.duration || 0), 0);
 

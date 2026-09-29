@@ -19,9 +19,10 @@ export default function JournalPreview({ journal: existingJournal }) {
         await updateJournal(journalId, { content });
       } else {
         const res = await createJournal({
+          title: `Reflection - ${new Date().toLocaleDateString()}`,
           content,
           date: new Date(),
-          mood: 'neutral',
+          mood: 'okay',
           tags: []
         });
         if (res.data?.data?._id) {

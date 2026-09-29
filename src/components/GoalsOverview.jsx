@@ -3,7 +3,9 @@ import { Check } from 'lucide-react';
 import { updateGoal } from '../services/api.js';
 
 export default function GoalsOverview({ goals: initialGoals }) {
-  const [goals, setGoals] = useState(initialGoals || []);
+  // Ensure goals is always an array
+  const safeGoals = Array.isArray(initialGoals) ? initialGoals : [];
+  const [goals, setGoals] = useState(safeGoals);
 
   const toggleGoal = async (index) => {
     const updated = [...goals];
@@ -31,7 +33,8 @@ export default function GoalsOverview({ goals: initialGoals }) {
     }
   };
 
-  const completedCount = goals.filter(g => g.completed).length;
+  // Safely filter goals
+  const completedCount = Array.isArray(goals) ? goals.filter(g => g.completed).length : 0;
 
   return (
     <div className="card fade-in">

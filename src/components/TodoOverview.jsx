@@ -5,7 +5,10 @@ import { updateTodo } from '../services/api.js';
 
 export default function TodoOverview({ todos: initialTodos }) {
   const navigate = useNavigate();
-  const [todos, setTodos] = useState(initialTodos || []);
+
+  // Ensure todos is always an array
+  const safeTodos = Array.isArray(initialTodos) ? initialTodos : [];
+  const [todos, setTodos] = useState(safeTodos);
 
   const toggleTodo = async (index) => {
     const updated = [...todos];
@@ -33,8 +36,9 @@ export default function TodoOverview({ todos: initialTodos }) {
     }
   };
 
-  const pendingTodos = todos.filter(t => !t.completed);
-  const completedTodos = todos.filter(t => t.completed);
+  // Safely filter todos
+  const pendingTodos = Array.isArray(todos) ? todos.filter(t => !t.completed) : [];
+  const completedTodos = Array.isArray(todos) ? todos.filter(t => t.completed) : [];
   const displayTodos = [...pendingTodos, ...completedTodos].slice(0, 6);
 
   return (

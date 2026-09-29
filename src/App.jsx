@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import TodayPage from './pages/TodayPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
+import JournalPage from './pages/JournalPage.jsx';
+import CalendarPage from './pages/CalendarPage.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -50,20 +52,8 @@ export default function App() {
                 icon="BookOpen"
               />
             } />
-            <Route path="journal" element={
-              <PlaceholderPage
-                title="Journal"
-                description="Reflect on your daily learning journey. Write thoughts, track insights, and build a knowledge log."
-                icon="BookText"
-              />
-            } />
-            <Route path="calendar" element={
-              <PlaceholderPage
-                title="Calendar"
-                description="Plan your study schedule, set deadlines, and visualize your learning timeline."
-                icon="CalendarDays"
-              />
-            } />
+            <Route path="journal" element={<JournalPage />} />
+            <Route path="calendar" element={<CalendarPage />} />
             <Route path="resources" element={
               <PlaceholderPage
                 title="Resources"

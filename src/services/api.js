@@ -29,7 +29,7 @@ api.interceptors.response.use(
 );
 
 // Dashboard
-export const getDashboardData = () => api.get('/dashboard/today');
+export const getDashboardData = () => api.get('/dashboard/overview');
 
 // Learning Paths
 export const getLearningPaths = () => api.get('/learning-paths');
@@ -59,8 +59,11 @@ export const getWeeklyStats = () => api.get('/study-sessions/stats/weekly');
 
 // Journals
 export const getJournals = (params) => api.get('/journals', { params });
+export const getJournalByDate = (date) => api.get(`/journals/date/${date}`);
 export const createJournal = (data) => api.post('/journals', data);
 export const updateJournal = (id, data) => api.put(`/journals/${id}`, data);
+export const patchJournal = (id, data) => api.patch(`/journals/${id}`, data);
+export const deleteJournal = (id) => api.delete(`/journals/${id}`);
 
 // User
 export const getProfile = () => api.get('/users/profile');
