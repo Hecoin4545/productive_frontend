@@ -55,6 +55,7 @@ export const getStudySessions = (params) => api.get('/study-sessions', { params 
 export const createStudySession = (data) => api.post('/study-sessions', data);
 export const updateStudySession = (id, data) => api.put(`/study-sessions/${id}`, data);
 export const deleteStudySession = (id) => api.delete(`/study-sessions/${id}`);
+export const getStudySessionStats = (params) => api.get('/study-sessions/stats/summary', { params });
 export const getWeeklyStats = () => api.get('/study-sessions/stats/weekly');
 
 // Journals
@@ -68,5 +69,20 @@ export const deleteJournal = (id) => api.delete(`/journals/${id}`);
 // User
 export const getProfile = () => api.get('/users/profile');
 export const updateProfile = (data) => api.put('/users/profile', data);
+
+// Analytics
+export const getAnalyticsOverview = (params) => api.get('/analytics/overview', { params });
+export const getAnalyticsStudyTime = (params) => api.get('/analytics/study-time', { params });
+export const getAnalyticsStudyTrend = (params) => api.get('/analytics/study-trend', { params });
+export const getAnalyticsSubjects = (params) => api.get('/analytics/subjects', { params });
+export const getAnalyticsLearningPaths = (params) => api.get('/analytics/learning-paths', { params });
+export const getAnalyticsTopics = (params) => api.get('/analytics/topics', { params });
+export const getAnalyticsTodos = (params) => api.get('/analytics/todos', { params });
+export const getAnalyticsGoals = (params) => api.get('/analytics/goals', { params });
+export const getAnalyticsHeatmap = (params) => api.get('/analytics/heatmap', { params });
+export const getAnalyticsHabits = (params) => api.get('/analytics/habits', { params });
+export const getAnalyticsJournal = (params) => api.get('/analytics/journal', { params });
+export const getAnalyticsRecentActivity = (params) => api.get('/analytics/recent-activity', { params });
+export const exportAnalytics = (params) => api.get('/analytics/export', { params, responseType: params?.format === 'csv' ? 'blob' : 'json' });
 
 export default api;
