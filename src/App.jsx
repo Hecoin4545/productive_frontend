@@ -10,6 +10,9 @@ import JournalPage from './pages/JournalPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
 import TimerPage from './pages/TimerPage.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
+import LearningPage from './pages/LearningPage.jsx';
+import LearningPathDetailPage from './pages/LearningPathDetailPage.jsx';
+import ResourcesPage from './pages/ResourcesPage.jsx';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -49,22 +52,11 @@ export default function App() {
             }>
               <Route index element={<Navigate to="/today" replace />} />
               <Route path="today" element={<TodayPage />} />
-              <Route path="learning" element={
-                <PlaceholderPage
-                  title="Learning"
-                  description="Manage your learning paths, track progress through modules, and build consistent study habits."
-                  icon="BookOpen"
-                />
-              } />
+              <Route path="learning" element={<LearningPage />} />
+              <Route path="learning/:id" element={<LearningPathDetailPage />} />
               <Route path="journal" element={<JournalPage />} />
               <Route path="calendar" element={<CalendarPage />} />
-              <Route path="resources" element={
-                <PlaceholderPage
-                  title="Resources"
-                  description="Save and organize articles, videos, courses, and study materials across all your learning paths."
-                  icon="FolderOpen"
-                />
-              } />
+              <Route path="resources" element={<ResourcesPage />} />
               <Route path="timer" element={<TimerPage />} />
               <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="settings" element={

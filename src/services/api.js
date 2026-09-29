@@ -85,4 +85,32 @@ export const getAnalyticsJournal = (params) => api.get('/analytics/journal', { p
 export const getAnalyticsRecentActivity = (params) => api.get('/analytics/recent-activity', { params });
 export const exportAnalytics = (params) => api.get('/analytics/export', { params, responseType: params?.format === 'csv' ? 'blob' : 'json' });
 
+// Extended Learning Paths, Modules & Topics
+export const getFullLearningPath = (id) => api.get(`/learning-paths/${id}/full`);
+export const createModule = (data) => api.post('/learning-paths/modules', data);
+export const updateModule = (id, data) => api.put(`/learning-paths/modules/${id}`, data);
+export const deleteModule = (id) => api.delete(`/learning-paths/modules/${id}`);
+export const createTopic = (data) => api.post('/learning-paths/topics', data);
+export const updateTopic = (id, data) => api.put(`/learning-paths/topics/${id}`, data);
+export const deleteTopic = (id) => api.delete(`/learning-paths/topics/${id}`);
+
+// Resources & Folders
+export const getResources = (params) => api.get('/resources', { params });
+export const getResource = (id) => api.get(`/resources/${id}`);
+export const createResource = (data) => api.post('/resources', data);
+export const updateResource = (id, data) => api.put(`/resources/${id}`, data);
+export const deleteResource = (id) => api.delete(`/resources/${id}`);
+export const markResourceOpen = (id) => api.patch(`/resources/${id}/open`);
+export const searchResources = (q) => api.get('/resources/search', { params: { q } });
+export const getFavoriteResources = () => api.get('/resources/favorites');
+export const getRecentlyUsedResources = () => api.get('/resources/recently-used');
+
+export const getResourceFolders = () => api.get('/resources/folders');
+export const createResourceFolder = (data) => api.post('/resources/folders', data);
+export const updateResourceFolder = (id, data) => api.put(`/resources/folders/${id}`, data);
+export const deleteResourceFolder = (id) => api.delete(`/resources/folders/${id}`);
+
+// Global Search
+export const globalSearch = (q) => api.get('/search/global', { params: { q } });
+
 export default api;
