@@ -70,6 +70,7 @@ export function TimerProvider({ children }) {
     completedBlocks: 0
   });
   const [isBreak, setIsBreak] = useState(false);
+  const [accumulatedFocusSeconds, setAccumulatedFocusSeconds] = useState(0);
 
   const intervalRef = useRef(null);
 
@@ -87,6 +88,7 @@ export function TimerProvider({ children }) {
       setSessionConfig(saved.sessionConfig || {});
       setPomodoroConfig(saved.pomodoroConfig || { focusMinutes: 25, breakMinutes: 5, completedBlocks: 0 });
       setIsBreak(saved.isBreak || false);
+      setAccumulatedFocusSeconds(saved.accumulatedFocusSeconds || 0);
     }
   }, []);
 
@@ -105,10 +107,23 @@ export function TimerProvider({ children }) {
         pauseIntervals,
         sessionConfig,
         pomodoroConfig,
-        isBreak
+        isBreak,
+        accumulatedFocusSeconds
       });
     }
-  }, [timerState, mode, targetDuration, startTimestamp, pauseTimestamp, totalPausedDuration, pauseIntervals, sessionConfig, pomodoroConfig, isBreak]);
+  }, [
+    timerState,
+    mode,
+    targetDuration,
+    startTimestamp,
+    pauseTimestamp,
+    totalPausedDuration,
+    pauseIntervals,
+    sessionConfig,
+    pomodoroConfig,
+    isBreak,
+    accumulatedFocusSeconds
+  ]);
 
   // Calculate elapsed from timestamps (accurate even after tab sleep)
   const calculateElapsed = useCallback(() => {
@@ -125,7 +140,21 @@ export function TimerProvider({ children }) {
     return Math.max(0, Math.floor(elapsedMs / 1000));
   }, [startTimestamp, totalPausedDuration, timerState, pauseTimestamp]);
 
-  // Timer tick
+
+  const handlePomodoroBreak = useCallback(() => {
+    setAccumulatedFocusSeconds(prev => prev + (Number(pomodoroConfig.focusMinutes) * 60));
+    setPomodoroConfig(prev => ({
+      ...prev,
+      completedBlocks: prev.completedBlocks + 1
+    }));
+    setIsBreak(true);
+    // Reset for break period
+    setStartTimestamp(Date.now());
+    setTotalPausedDuration(0);
+    setPauseIntervals([]);
+    setTargetDuration(Number(pomodoroConfig.breakMinutes) * 60);
+  }, [pomodoroConfig.focusMinutes, pomodoroConfig.breakMinutes]);
+
   useEffect(() => {
     if (timerState === TIMER_STATES.RUNNING) {
       const tick = () => {
@@ -155,20 +184,7 @@ export function TimerProvider({ children }) {
         intervalRef.current = null;
       }
     }
-  }, [timerState, calculateElapsed, mode, targetDuration, isBreak]);
-
-  const handlePomodoroBreak = useCallback(() => {
-    setPomodoroConfig(prev => ({
-      ...prev,
-      completedBlocks: prev.completedBlocks + 1
-    }));
-    setIsBreak(true);
-    // Reset for break period
-    setStartTimestamp(Date.now());
-    setTotalPausedDuration(0);
-    setPauseIntervals([]);
-    setTargetDuration(pomodoroConfig.breakMinutes * 60);
-  }, [pomodoroConfig.breakMinutes]);
+  }, [timerState, calculateElapsed, mode, targetDuration, isBreak, handlePomodoroBreak]);
 
   const startTimer = useCallback((config = {}) => {
     const now = Date.now();
@@ -178,6 +194,7 @@ export function TimerProvider({ children }) {
     setPauseIntervals([]);
     setElapsed(0);
     setIsBreak(false);
+    setAccumulatedFocusSeconds(0);
 
     if (config.subject !== undefined) {
       setSessionConfig({
@@ -239,11 +256,15 @@ export function TimerProvider({ children }) {
     setElapsed(finalElapsed);
     setTimerState(TIMER_STATES.IDLE);
 
+    const safeAccumulated = Number(accumulatedFocusSeconds) || 0;
+    const safeElapsed = Number(finalElapsed) || 0;
+    const totalFocusDuration = safeAccumulated + (isBreak ? 0 : safeElapsed);
+
     const result = {
       ...sessionConfig,
       startTime: startTimestamp ? new Date(startTimestamp).toISOString() : null,
       endTime: new Date().toISOString(),
-      duration: finalElapsed,
+      duration: totalFocusDuration,
       mode,
       pomodoroConfig: mode === TIMER_MODES.POMODORO ? pomodoroConfig : undefined,
       pauseIntervals
@@ -257,10 +278,11 @@ export function TimerProvider({ children }) {
     setElapsed(0);
     setTargetDuration(0);
     setIsBreak(false);
+    setAccumulatedFocusSeconds(0);
     saveTimerState(null);
 
     return result;
-  }, [calculateElapsed, sessionConfig, startTimestamp, mode, pomodoroConfig, pauseIntervals]);
+  }, [calculateElapsed, sessionConfig, startTimestamp, mode, pomodoroConfig, pauseIntervals, accumulatedFocusSeconds, isBreak]);
 
   const resetTimer = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -272,6 +294,7 @@ export function TimerProvider({ children }) {
     setElapsed(0);
     setTargetDuration(0);
     setIsBreak(false);
+    setAccumulatedFocusSeconds(0);
     saveTimerState(null);
   }, []);
 

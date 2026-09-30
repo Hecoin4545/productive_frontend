@@ -3,10 +3,11 @@ import { useTimer } from '../context/TimerContext.jsx';
 import {
   Timer, Play, Pause, Square, RotateCcw, Clock,
   BookOpen, Target, Flame, TrendingUp, ChevronDown,
-  X, CheckCircle2, AlertCircle, Coffee
+  X, CheckCircle2, AlertCircle, Coffee, Plus
 } from 'lucide-react';
 import {
-  createStudySession, getStudySessions, getStudySessionStats, getLearningPaths
+  createStudySession, getStudySessions, getStudySessionStats, getLearningPaths,
+  getProfile, updateProfile
 } from '../services/api.js';
 
 // ─── Helpers ────────────────────────────────────────────
@@ -22,6 +23,8 @@ function formatDuration(seconds) {
   if (!seconds || seconds <= 0) return '0m';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h === 0 && m === 0) return `${s}s`;
   if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
@@ -92,6 +95,9 @@ export default function TimerPage() {
   // Setup state
   const [subject, setSubject] = useState('Data Structures & Algorithms');
   const [learningPaths, setLearningPaths] = useState([]);
+  const [customSubjects, setCustomSubjects] = useState([]);
+  const [isAddingSubject, setIsAddingSubject] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
   const [selectedPath, setSelectedPath] = useState(null);
   const [moduleName, setModuleName] = useState('');
   const [topicName, setTopicName] = useState('');
@@ -127,6 +133,14 @@ export default function TimerPage() {
         if (res.data?.success) setLearningPaths(res.data.data || []);
       })
       .catch(() => {});
+      
+    getProfile()
+      .then(res => {
+        if (res.data?.success && res.data.user.customSubjects) {
+          setCustomSubjects(res.data.user.customSubjects);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Load recent sessions and stats
@@ -156,6 +170,25 @@ export default function TimerPage() {
       setTask(sessionConfig.task || '');
     }
   }, [isActive, sessionConfig]);
+
+  const handleAddCustomSubject = async () => {
+    if (!newSubjectName.trim()) return;
+    const addedSubject = newSubjectName.trim();
+    const updatedSubjects = [...new Set([...customSubjects, addedSubject])];
+    
+    setCustomSubjects(updatedSubjects);
+    setSubject(addedSubject);
+    setNewSubjectName('');
+    setIsAddingSubject(false);
+    
+    try {
+      await updateProfile({ customSubjects: updatedSubjects });
+    } catch (err) {
+      console.error('Failed to save custom subject:', err);
+    }
+  };
+
+  const allSubjects = [...new Set([...SUBJECTS, ...customSubjects])];
 
   // ─── Actions ──────────────────────
   const handleStart = () => {
@@ -196,30 +229,32 @@ export default function TimerPage() {
     if (!completionData) return;
     setSaving(true);
     try {
+      const safeDuration = Number(completionData.duration) || 0;
       await createStudySession({
-        subject: completionData.subject || subject,
-        learningPathId: completionData.learningPathId,
-        moduleName: completionData.moduleName,
-        topicName: completionData.topicName,
+        subject: completionData.subject || subject || 'General',
+        learningPathId: completionData.learningPathId || null,
+        moduleName: completionData.moduleName || '',
+        topicName: completionData.topicName || '',
         topic: completionData.topicName || completionData.moduleName || '',
-        task: completionData.task,
-        startTime: completionData.startTime,
-        endTime: completionData.endTime,
-        duration: completionData.duration,
-        mode: completionData.mode,
-        pomodoroConfig: completionData.pomodoroConfig,
-        pauseIntervals: completionData.pauseIntervals,
-        notes: sessionNotes,
-        accomplishments,
-        learned,
-        problemsCompleted,
-        date: completionData.startTime
+        task: completionData.task || '',
+        startTime: completionData.startTime || new Date().toISOString(),
+        endTime: completionData.endTime || new Date().toISOString(),
+        duration: safeDuration,
+        mode: completionData.mode || 'stopwatch',
+        pomodoroConfig: completionData.pomodoroConfig || undefined,
+        pauseIntervals: completionData.pauseIntervals || [],
+        notes: sessionNotes || '',
+        accomplishments: accomplishments || '',
+        learned: learned || '',
+        problemsCompleted: Number(problemsCompleted) || 0,
+        date: completionData.startTime || new Date().toISOString()
       });
       setShowCompletion(false);
       setCompletionData(null);
       loadData();
     } catch (err) {
       console.error('Failed to save session:', err);
+      alert('Failed to save session. Please try again.');
     }
     setSaving(false);
   };
@@ -523,7 +558,7 @@ export default function TimerPage() {
               <div className="timer-setup-field">
                 <label className="form-label">Subject</label>
                 <div className="timer-subject-grid">
-                  {SUBJECTS.map(s => (
+                  {allSubjects.map(s => (
                     <button
                       key={s}
                       className={`timer-subject-btn ${subject === s ? 'active' : ''}`}
@@ -539,6 +574,36 @@ export default function TimerPage() {
                       {s}
                     </button>
                   ))}
+                  
+                  {isAddingSubject ? (
+                    <div className="timer-add-subject-input-wrapper">
+                      <input
+                        type="text"
+                        className="form-input timer-add-subject-input"
+                        placeholder="Subject name..."
+                        value={newSubjectName}
+                        onChange={e => setNewSubjectName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleAddCustomSubject();
+                          if (e.key === 'Escape') setIsAddingSubject(false);
+                        }}
+                        autoFocus
+                      />
+                      <button className="timer-add-subject-save" onClick={handleAddCustomSubject}>
+                        <CheckCircle2 size={16} />
+                      </button>
+                      <button className="timer-add-subject-cancel" onClick={() => setIsAddingSubject(false)}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="timer-subject-btn timer-add-subject-btn"
+                      onClick={() => setIsAddingSubject(true)}
+                    >
+                      <Plus size={14} /> Add Subject
+                    </button>
+                  )}
                 </div>
               </div>
 
