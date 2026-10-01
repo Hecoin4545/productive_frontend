@@ -6,7 +6,6 @@ import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import TodayPage from './pages/TodayPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
-import JournalPage from './pages/JournalPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
 import TimerPage from './pages/TimerPage.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
@@ -54,7 +53,6 @@ export default function App() {
               <Route path="today" element={<TodayPage />} />
               <Route path="learning" element={<LearningPage />} />
               <Route path="learning/:id" element={<LearningPathDetailPage />} />
-              <Route path="journal" element={<JournalPage />} />
               <Route path="calendar" element={<CalendarPage />} />
               <Route path="resources" element={<ResourcesPage />} />
               <Route path="timer" element={<TimerPage />} />

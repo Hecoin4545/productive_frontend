@@ -11,7 +11,6 @@ import StudyActivity from '../components/StudyActivity.jsx';
 import StudyChart from '../components/StudyChart.jsx';
 import LearningProgress from '../components/LearningProgress.jsx';
 import GoalsOverview from '../components/GoalsOverview.jsx';
-import JournalPreview from '../components/JournalPreview.jsx';
 
 // Mock data fallback
 const mockData = {
@@ -54,7 +53,6 @@ const mockData = {
     { _id: 'lp3', title: 'Web Development', progress: 64, color: '#F59E0B' },
     { _id: 'lp4', title: 'System Design', progress: 31, color: '#EF4444' },
   ],
-  journal: null,
   stats: {
     studyTime: 225,
     tasksCompleted: 3,
@@ -112,7 +110,6 @@ export default function TodayPage() {
           goals: Array.isArray(apiData.goals) ? apiData.goals : [],
           studySessions: Array.isArray(apiData.studySessions) ? apiData.studySessions : [],
           learningPaths: Array.isArray(apiData.learningPaths) ? apiData.learningPaths : [],
-          journal: apiData.journal || null,
           stats: apiData.stats || mockData.stats,
           weeklyStudy: Array.isArray(apiData.weeklyStudy) ? apiData.weeklyStudy : mockData.weeklyStudy
         });
@@ -207,9 +204,6 @@ export default function TodayPage() {
         {/* Right column: Goals */}
         <GoalsOverview goals={Array.isArray(d.goals) ? d.goals : mockData.goals} />
       </div>
-
-      {/* Journal Preview - Full Width */}
-      <JournalPreview journal={d.journal} />
     </div>
   );
 }

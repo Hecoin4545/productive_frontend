@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Clock, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Clock, Trash2, CheckCircle2, XCircle } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import { getTodos, createTodo, updateTodo, deleteTodo } from '../services/api.js';
 import '../index.css';
@@ -26,6 +26,21 @@ const getDurationMinutes = (todo) => {
   const raw = todo.estimatedDuration ?? todo.estimatedMinutes;
   const mins = parseInt(raw, 10);
   return Number.isFinite(mins) && mins > 0 ? mins : 60;
+};
+
+// done = ticked off in the todo list, missed = day ended without a tick, pending = still open
+const getSessionStatus = (todo) => {
+  if (todo.completed) return 'done';
+  if (!todo.dueDate) return 'pending';
+  const d = new Date(todo.dueDate);
+  const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  return Date.now() > endOfDay.getTime() ? 'missed' : 'pending';
+};
+
+const STATUS_COLOR = {
+  done: '#22c55e',
+  missed: '#ef4444',
+  pending: null
 };
 
 export default function CalendarPage() {
@@ -90,6 +105,21 @@ export default function CalendarPage() {
       const dd = new Date(sunday);
       dd.setDate(sunday.getDate() + i);
       return dd;
+    });
+  };
+
+  // Full 6x7 grid for the month view, Sunday-first
+  const getMonthCells = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const first = new Date(year, month, 1);
+    const start = new Date(first);
+    start.setDate(first.getDate() - first.getDay());
+
+    return Array.from({ length: 42 }, (_, i) => {
+      const cell = new Date(start);
+      cell.setDate(start.getDate() + i);
+      return { date: cell, inMonth: cell.getMonth() === month };
     });
   };
 
@@ -188,6 +218,7 @@ export default function CalendarPage() {
   };
 
   const weekDays = getWeekDays(currentDate);
+  const monthCells = getMonthCells(currentDate);
   const dayKey = toDateKey(currentDate);
   const dayTodos = todos.filter(t => t.dueDate && toDateKey(t.dueDate) === dayKey);
   
@@ -251,6 +282,9 @@ export default function CalendarPage() {
                 Day
               </button>
             </div>
+            <button className="btn btn-secondary" style={{ marginRight: '8px' }} onClick={() => setCurrentDate(new Date())}>
+              Today
+            </button>
             <button className="btn btn-primary" onClick={() => openTaskForm(toDateKey(currentDate), '09:00')}>
               <Plus size={16} /> Add Task
             </button>
@@ -305,7 +339,8 @@ export default function CalendarPage() {
                         
                         const topOffset = (startHour - HOURS[0]) * 60;
                         const height = getDurationMinutes(todo);
-                        const bgColor = getSubjectColor(todo.description);
+                        const status = getSessionStatus(todo);
+                        const bgColor = status === 'pending' ? getSubjectColor(todo.description) : STATUS_COLOR[status];
                         
                         return (
                           <div 
@@ -326,13 +361,17 @@ export default function CalendarPage() {
                               boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                               transition: 'transform 0.2s'
                             }}
-                            title={`${todo.title} - click to edit`}
+                            title={`${todo.title} - ${status === 'done' ? 'Completed' : status === 'missed' ? 'Missed' : 'Scheduled'} - click to edit`}
                             onClick={(e) => {
                               e.stopPropagation();
                               openEditForm(todo);
                             }}
                           >
-                            <div style={{ fontWeight: 600, color: bgColor, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{todo.title}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              {status === 'done' && <CheckCircle2 size={12} color={STATUS_COLOR.done} style={{ flexShrink: 0 }} />}
+                              {status === 'missed' && <XCircle size={12} color={STATUS_COLOR.missed} style={{ flexShrink: 0 }} />}
+                              <div style={{ fontWeight: 600, color: bgColor, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textDecoration: status === 'done' ? 'line-through' : 'none' }}>{todo.title}</div>
+                            </div>
                             <div style={{ color: 'var(--color-text-secondary)', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
                               <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                 <Clock size={10} />
@@ -398,7 +437,8 @@ export default function CalendarPage() {
 
                     const topOffset = (startHour - HOURS[0]) * 64;
                     const height = Math.max(getDurationMinutes(todo), 28);
-                    const bgColor = getSubjectColor(todo.description);
+                    const status = getSessionStatus(todo);
+                    const bgColor = status === 'pending' ? getSubjectColor(todo.description) : STATUS_COLOR[status];
 
                     return (
                       <div
@@ -418,14 +458,18 @@ export default function CalendarPage() {
                           cursor: 'pointer',
                           boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
                         }}
-                        title={`${todo.title} - click to edit`}
+                        title={`${todo.title} - ${status === 'done' ? 'Completed' : status === 'missed' ? 'Missed' : 'Scheduled'} - click to edit`}
                         onClick={(e) => {
                           e.stopPropagation();
                           openEditForm(todo);
                         }}
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                          <div style={{ fontWeight: 600, color: bgColor, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{todo.title}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                            {status === 'done' && <CheckCircle2 size={15} color={STATUS_COLOR.done} style={{ flexShrink: 0 }} />}
+                            {status === 'missed' && <XCircle size={15} color={STATUS_COLOR.missed} style={{ flexShrink: 0 }} />}
+                            <div style={{ fontWeight: 600, color: bgColor, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', textDecoration: status === 'done' ? 'line-through' : 'none' }}>{todo.title}</div>
+                          </div>
                           <button
                             className="btn btn-secondary"
                             style={{ padding: '2px 4px', flexShrink: 0 }}
@@ -439,6 +483,8 @@ export default function CalendarPage() {
                           <Clock size={10} />
                           {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           ({getDurationMinutes(todo)}m)
+                          {status === 'done' && <span style={{ color: STATUS_COLOR.done, fontWeight: 600 }}>Completed</span>}
+                          {status === 'missed' && <span style={{ color: STATUS_COLOR.missed, fontWeight: 600 }}>Missed</span>}
                         </div>
                       </div>
                     );
@@ -455,8 +501,115 @@ export default function CalendarPage() {
           )}
 
           {view === 'month' && (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-              Month view is currently under development. Please use Day or Week view.
+            <div style={{ minWidth: '760px', display: 'flex', flexDirection: 'column' }}>
+              {/* Weekday Header */}
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)' }}>
+                {DAYS.map(d => (
+                  <div key={d} style={{ flex: 1, textAlign: 'center', padding: '10px 4px', fontSize: '12px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* Month Grid */}
+              <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+                {monthCells.map(({ date: cellDate, inMonth }) => {
+                  const cellKey = toDateKey(cellDate);
+                  const cellTodos = todos
+                    .filter(t => t.dueDate && toDateKey(t.dueDate) === cellKey)
+                    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+                  const isToday = isSameDay(cellDate, new Date());
+                  const visible = cellTodos.slice(0, 3);
+                  const overflow = cellTodos.length - visible.length;
+                  const totalMinutes = cellTodos.reduce((sum, t) => sum + getDurationMinutes(t), 0);
+
+                  return (
+                    <div
+                      key={cellKey}
+                      style={{
+                        flex: '0 0 14.2857%',
+                        minHeight: '110px',
+                        padding: '6px',
+                        borderRight: '1px solid var(--color-border)',
+                        borderBottom: '1px solid var(--color-border)',
+                        backgroundColor: inMonth ? 'transparent' : 'var(--color-bg-secondary)',
+                        opacity: inMonth ? 1 : 0.55,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        cursor: 'pointer',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-bg-secondary)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = inMonth ? 'transparent' : 'var(--color-bg-secondary)'; }}
+                      onClick={() => { setCurrentDate(cellDate); setView('day'); }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{
+                          fontSize: '13px',
+                          fontWeight: isToday ? 700 : 500,
+                          color: isToday ? '#fff' : 'var(--color-text-primary)',
+                          backgroundColor: isToday ? 'var(--color-primary)' : 'transparent',
+                          borderRadius: '999px',
+                          minWidth: '22px',
+                          height: '22px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          {cellDate.getDate()}
+                        </span>
+                        {cellTodos.length > 0 && (
+                          <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }} title={`${totalMinutes} minutes scheduled`}>
+                            {(totalMinutes / 60).toFixed(totalMinutes % 60 === 0 ? 0 : 1)}h
+                          </span>
+                        )}
+                      </div>
+
+                      {visible.map(todo => {
+                        const status = getSessionStatus(todo);
+                        const bgColor = status === 'pending' ? getSubjectColor(todo.description) : STATUS_COLOR[status];
+                        const due = new Date(todo.dueDate);
+                        return (
+                          <div
+                            key={todo._id}
+                            style={{
+                              fontSize: '11px',
+                              backgroundColor: `${bgColor}20`,
+                              borderLeft: `3px solid ${bgColor}`,
+                              borderRadius: '3px',
+                              padding: '2px 5px',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              color: 'var(--color-text-primary)',
+                              cursor: 'pointer'
+                            }}
+                            title={`${due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${todo.title} (${getDurationMinutes(todo)}m, ${status === 'done' ? 'completed' : status === 'missed' ? 'missed' : 'scheduled'}). Click to edit.`}
+                            onClick={(e) => { e.stopPropagation(); openEditForm(todo); }}
+                          >
+                            {status === 'done' && <CheckCircle2 size={11} color={STATUS_COLOR.done} style={{ verticalAlign: '-1px', marginRight: '3px', flexShrink: 0 }} />}
+                            {status === 'missed' && <XCircle size={11} color={STATUS_COLOR.missed} style={{ verticalAlign: '-1px', marginRight: '3px', flexShrink: 0 }} />}
+                            <span style={{ color: 'var(--color-text-tertiary)', marginRight: '4px' }}>
+                              {due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span style={{ textDecoration: status === 'done' ? 'line-through' : 'none' }}>{todo.title}</span>
+                          </div>
+                        );
+                      })}
+
+                      {overflow > 0 && (
+                        <div
+                          style={{ fontSize: '11px', color: 'var(--color-text-secondary)', paddingLeft: '4px' }}
+                          onClick={(e) => { e.stopPropagation(); setCurrentDate(cellDate); setView('day'); }}
+                        >
+                          +{overflow} more
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

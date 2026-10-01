@@ -1,14 +1,13 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
-  LayoutDashboard, BookOpen, BookText, CalendarDays,
+  LayoutDashboard, BookOpen, CalendarDays,
   FolderOpen, Timer, BarChart3, Settings, LogOut
 } from 'lucide-react';
 
 const navItems = [
   { to: '/today', label: 'Today', icon: LayoutDashboard },
   { to: '/learning', label: 'Learning', icon: BookOpen },
-  { to: '/journal', label: 'Journal', icon: BookText },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/resources', label: 'Resources', icon: FolderOpen },
   { to: '/timer', label: 'Study Timer', icon: Timer },

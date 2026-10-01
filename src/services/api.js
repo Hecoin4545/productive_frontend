@@ -58,14 +58,6 @@ export const deleteStudySession = (id) => api.delete(`/study-sessions/${id}`);
 export const getStudySessionStats = (params) => api.get('/study-sessions/stats/summary', { params });
 export const getWeeklyStats = () => api.get('/study-sessions/stats/weekly');
 
-// Journals
-export const getJournals = (params) => api.get('/journals', { params });
-export const getJournalByDate = (date) => api.get(`/journals/date/${date}`);
-export const createJournal = (data) => api.post('/journals', data);
-export const updateJournal = (id, data) => api.put(`/journals/${id}`, data);
-export const patchJournal = (id, data) => api.patch(`/journals/${id}`, data);
-export const deleteJournal = (id) => api.delete(`/journals/${id}`);
-
 // User
 export const getProfile = () => api.get('/users/profile');
 export const updateProfile = (data) => api.put('/users/profile', data);
@@ -81,7 +73,6 @@ export const getAnalyticsTodos = (params) => api.get('/analytics/todos', { param
 export const getAnalyticsGoals = (params) => api.get('/analytics/goals', { params });
 export const getAnalyticsHeatmap = (params) => api.get('/analytics/heatmap', { params });
 export const getAnalyticsHabits = (params) => api.get('/analytics/habits', { params });
-export const getAnalyticsJournal = (params) => api.get('/analytics/journal', { params });
 export const getAnalyticsRecentActivity = (params) => api.get('/analytics/recent-activity', { params });
 export const exportAnalytics = (params) => api.get('/analytics/export', { params, responseType: params?.format === 'csv' ? 'blob' : 'json' });
 

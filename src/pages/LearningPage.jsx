@@ -2,9 +2,20 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, Plus, Search, Filter, ArrowUpDown, Clock, CheckCircle,
-  Target, Layers, Calendar, ChevronRight, Play, MoreVertical, Sparkles
+  Target, Layers, Calendar, ChevronRight, X, Sparkles, Route, Trophy
 } from 'lucide-react';
 import { getLearningPaths, createLearningPath } from '../services/api';
+
+const SUBJECTS = [
+  { name: 'DSA', color: '#6C63FF' },
+  { name: 'Machine Learning', color: '#22C55E' },
+  { name: 'Web Development', color: '#F59E0B' },
+  { name: 'Mathematics', color: '#06B6D4' },
+  { name: 'System Design', color: '#EF4444' },
+  { name: 'Other', color: '#8B5CF6' },
+];
+
+const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
 
 export default function LearningPage() {
   const navigate = useNavigate();
@@ -24,7 +35,7 @@ export default function LearningPage() {
     subject: 'DSA',
     difficulty: 'Intermediate',
     targetDate: '',
-    color: '#6366F1'
+    color: '#6C63FF'
   });
   const [creating, setCreating] = useState(false);
 
@@ -60,7 +71,7 @@ export default function LearningPage() {
           subject: 'DSA',
           difficulty: 'Intermediate',
           targetDate: '',
-          color: '#6366F1'
+          color: '#6C63FF'
         });
         navigate(`/learning/${res.data.data._id}`);
       }
@@ -124,12 +135,9 @@ export default function LearningPage() {
               onChange={e => setSelectedSubject(e.target.value)}
             >
               <option value="all">All Subjects</option>
-              <option value="DSA">DSA</option>
-              <option value="Machine Learning">Machine Learning</option>
-              <option value="Web Development">Web Development</option>
-              <option value="Mathematics">Mathematics</option>
-              <option value="System Design">System Design</option>
-              <option value="Other">Other</option>
+              {SUBJECTS.map(s => (
+                <option key={s.name} value={s.name}>{s.name}</option>
+              ))}
             </select>
           </div>
 
@@ -157,9 +165,14 @@ export default function LearningPage() {
       ) : filteredPaths.length > 0 ? (
         <div className="learning-cards-grid">
           {filteredPaths.map(path => (
-            <div key={path._id} className="learning-path-card" onClick={() => navigate(`/learning/${path._id}`)}>
+            <div
+              key={path._id}
+              className="learning-path-card"
+              style={{ '--path-accent': path.color || '#6C63FF' }}
+              onClick={() => navigate(`/learning/${path._id}`)}
+            >
               <div className="path-card-header">
-                <div className="path-subject-badge" style={{ backgroundColor: path.color || '#6366F1' }}>
+                <div className="path-subject-badge" style={{ backgroundColor: path.color || '#6C63FF' }}>
                   {path.subject || 'General'}
                 </div>
                 <div className="path-difficulty-badge">
@@ -180,7 +193,7 @@ export default function LearningPage() {
                 <div className="progress-bar">
                   <div
                     className="progress-fill"
-                    style={{ width: `${path.progress || 0}%`, backgroundColor: path.color || '#6366F1' }}
+                    style={{ width: `${path.progress || 0}%`, backgroundColor: path.color || '#6C63FF' }}
                   />
                 </div>
               </div>
@@ -201,7 +214,13 @@ export default function LearningPage() {
                   <span className="lbl">CURRENT TOPIC:</span>
                   <span className="val">{path.currentTopic || 'Dynamic Programming'}</span>
                 </div>
-                <button className="btn btn-secondary btn-sm continue-btn">
+                <button
+                  className="btn btn-secondary btn-sm continue-btn"
+                  onClick={e => {
+                    e.stopPropagation();
+                    navigate(`/learning/${path._id}`);
+                  }}
+                >
                   <span>Continue</span>
                   <ChevronRight size={14} />
                 </button>
@@ -211,9 +230,22 @@ export default function LearningPage() {
         </div>
       ) : (
         <div className="learning-empty-card">
-          <BookOpen size={48} className="empty-icon" />
+          <div className="empty-icon-wrap">
+            <BookOpen size={36} className="empty-icon" strokeWidth={1.75} />
+          </div>
           <h3>Start your learning journey</h3>
           <p>Create a learning path and break it into modules and topics.</p>
+          <div className="empty-features">
+            <span className="empty-feature-chip">
+              <Layers size={12} /> Modules & topics
+            </span>
+            <span className="empty-feature-chip">
+              <Target size={12} /> Track goals
+            </span>
+            <span className="empty-feature-chip">
+              <Trophy size={12} /> Measure progress
+            </span>
+          </div>
           <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
             <Plus size={16} />
             <span>Create Learning Path</span>
@@ -224,14 +256,23 @@ export default function LearningPage() {
       {/* Create Learning Path Modal */}
       {showCreateModal && (
         <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>New Learning Path</h2>
-              <button className="modal-close-btn" onClick={() => setShowCreateModal(false)}>×</button>
+              <div className="modal-header-icon">
+                <Route size={22} strokeWidth={2} />
+              </div>
+              <div className="modal-header-text">
+                <h2>Create Learning Path</h2>
+                <p className="modal-subtitle">Design a structured roadmap to master your subject</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowCreateModal(false)} aria-label="Close">
+                <X size={18} />
+              </button>
             </div>
+
             <form onSubmit={handleCreatePath} className="modal-form">
               <div className="form-group">
-                <label>Path Name *</label>
+                <label>Path Name <span className="req">*</span></label>
                 <input
                   type="text"
                   required
@@ -243,46 +284,51 @@ export default function LearningPage() {
 
               <div className="form-group">
                 <label>Subject</label>
-                <select
-                  value={formData.subject}
-                  onChange={e => setFormData({ ...formData, subject: e.target.value })}
-                >
-                  <option value="DSA">DSA</option>
-                  <option value="Machine Learning">Machine Learning</option>
-                  <option value="Web Development">Web Development</option>
-                  <option value="Mathematics">Mathematics</option>
-                  <option value="System Design">System Design</option>
-                  <option value="Other">Other</option>
-                </select>
+                <div className="subject-chip-grid">
+                  {SUBJECTS.map(s => (
+                    <button
+                      type="button"
+                      key={s.name}
+                      className={`subject-chip ${formData.subject === s.name ? 'active' : ''}`}
+                      style={{ '--chip-color': s.color }}
+                      onClick={() => setFormData({ ...formData, subject: s.name, color: s.color })}
+                    >
+                      <span className="chip-dot" />
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Difficulty</label>
-                  <select
-                    value={formData.difficulty}
-                    onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
-                  >
-                    <option value="Beginner">Beginner</option>
-                    <option value="Intermediate">Intermediate</option>
-                    <option value="Advanced">Advanced</option>
-                  </select>
+              <div className="form-group">
+                <label>Difficulty</label>
+                <div className="difficulty-segment">
+                  {DIFFICULTIES.map(d => (
+                    <button
+                      type="button"
+                      key={d}
+                      className={`segment-btn ${formData.difficulty === d ? 'active' : ''}`}
+                      onClick={() => setFormData({ ...formData, difficulty: d })}
+                    >
+                      {d}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                <div className="form-group">
-                  <label>Target Date</label>
-                  <input
-                    type="date"
-                    value={formData.targetDate}
-                    onChange={e => setFormData({ ...formData, targetDate: e.target.value })}
-                  />
-                </div>
+              <div className="form-group">
+                <label>Target Date</label>
+                <input
+                  type="date"
+                  value={formData.targetDate}
+                  onChange={e => setFormData({ ...formData, targetDate: e.target.value })}
+                />
               </div>
 
               <div className="form-group">
                 <label>Description</label>
                 <textarea
-                  rows="2"
+                  rows="3"
                   placeholder="What do you want to learn in this path?"
                   value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
@@ -297,6 +343,7 @@ export default function LearningPage() {
                   value={formData.goal}
                   onChange={e => setFormData({ ...formData, goal: e.target.value })}
                 />
+                <span className="field-hint">Your main outcome for completing this path</span>
               </div>
 
               <div className="modal-actions">
@@ -304,7 +351,17 @@ export default function LearningPage() {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={creating}>
-                  {creating ? 'Creating...' : 'Create Path'}
+                  {creating ? (
+                    <>
+                      <Sparkles size={14} className="spin-once" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={14} />
+                      Create Path
+                    </>
+                  )}
                 </button>
               </div>
             </form>

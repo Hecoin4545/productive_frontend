@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  Clock, CheckCircle, Target, Award, Calendar, BookOpen,
+  Clock, CheckCircle, Target, Award, Calendar,
   TrendingUp, BarChart3, PieChart, Activity, Zap, Download,
   Filter, ChevronDown, RefreshCw, ArrowUpRight, ArrowDownRight,
   Brain, Layers, Sparkles, AlertCircle
@@ -9,7 +9,7 @@ import {
   getAnalyticsOverview, getAnalyticsStudyTime, getAnalyticsStudyTrend,
   getAnalyticsSubjects, getAnalyticsLearningPaths, getAnalyticsTopics,
   getAnalyticsTodos, getAnalyticsGoals, getAnalyticsHeatmap,
-  getAnalyticsHabits, getAnalyticsJournal, getAnalyticsRecentActivity,
+  getAnalyticsHabits, getAnalyticsRecentActivity,
   getLearningPaths, exportAnalytics
 } from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -25,7 +25,7 @@ export default function AnalyticsPage() {
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedPathId, setSelectedPathId] = useState('all');
   const [trendRange, setTrendRange] = useState('30d');
-  const [heatmapMetric, setHeatmapMetric] = useState('studyTime'); // studyTime, tasks, journal
+  const [heatmapMetric, setHeatmapMetric] = useState('studyTime'); // studyTime, tasks
 
   // State
   const [loading, setLoading] = useState(true);
@@ -41,7 +41,6 @@ export default function AnalyticsPage() {
   const [goalData, setGoalData] = useState(null);
   const [heatmapData, setHeatmapData] = useState(null);
   const [habitData, setHabitData] = useState(null);
-  const [journalData, setJournalData] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
 
   const [exportLoading, setExportLoading] = useState(false);
@@ -84,13 +83,12 @@ export default function AnalyticsPage() {
       getAnalyticsGoals(params),
       getAnalyticsHeatmap({ metric: heatmapMetric }),
       getAnalyticsHabits(params),
-      getAnalyticsJournal(params),
       getAnalyticsRecentActivity()
     ])
       .then(([
         overviewRes, studyTimeRes, trendRes, subjectRes,
         pathRes, topicRes, todoRes, goalRes, heatmapRes,
-        habitRes, journalRes, recentRes
+        habitRes, recentRes
       ]) => {
         if (!isMounted) return;
         if (overviewRes.data?.success) setOverview(overviewRes.data.data);
@@ -103,7 +101,6 @@ export default function AnalyticsPage() {
         if (goalRes.data?.success) setGoalData(goalRes.data.data);
         if (heatmapRes.data?.success) setHeatmapData(heatmapRes.data.data);
         if (habitRes.data?.success) setHabitData(habitRes.data.data);
-        if (journalRes.data?.success) setJournalData(journalRes.data.data);
         if (recentRes.data?.success) setRecentActivities(recentRes.data.data);
       })
       .catch(err => console.error('Analytics load error:', err))
@@ -387,22 +384,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Card 6: Journal Entries */}
-        <div className="summary-card">
-          <div className="summary-card-header">
-            <span className="summary-card-title">JOURNAL ENTRIES</span>
-            <div className="summary-card-icon" style={{ background: 'rgba(6, 182, 212, 0.1)', color: '#06B6D4' }}>
-              <BookOpen size={16} />
-            </div>
-          </div>
-          <div className="summary-card-value">
-            {loading ? <span className="skeleton-pulse">...</span> : (overview?.journalEntries || 0)}
-          </div>
-          <div className="summary-card-footer">
-            <span className="summary-card-subtext">Reflections logged</span>
-          </div>
         </div>
-      </div>
 
       {/* ─── 15. & 16. Study Consistency & Heatmap ──────────── */}
       <div className="analytics-card heatmap-card">
@@ -424,12 +406,6 @@ export default function AnalyticsPage() {
               onClick={() => setHeatmapMetric('tasks')}
             >
               Tasks Completed
-            </button>
-            <button
-              className={`metric-btn ${heatmapMetric === 'journal' ? 'active' : ''}`}
-              onClick={() => setHeatmapMetric('journal')}
-            >
-              Journal Entries
             </button>
           </div>
         </div>
@@ -453,7 +429,7 @@ export default function AnalyticsPage() {
                       <div className="tooltip-val">
                         Study Time: {formatSecsToHours(tile.studySeconds)} ({tile.studySeconds > 0 ? Math.round(tile.studySeconds/60) + 'm' : '0m'})
                       </div>
-                      <div className="tooltip-sub">Tasks: {tile.tasksCount} | Journal: {tile.journalCount > 0 ? 'Yes' : 'No'}</div>
+                      <div className="tooltip-sub">Tasks: {tile.tasksCount}</div>
                     </div>
                   )}
                 </div>
@@ -898,41 +874,41 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* ─── 19. & 20. Reflection & Recent Activity ────────── */}
+      {/* ─── 19. Recent Activity ───────────────────────────── */}
       <div className="analytics-two-col">
-        {/* Left: Reflection (Journal Analytics) */}
+        {/* Left: Reflection placeholder */}
         <div className="analytics-card">
           <div className="card-header-row">
             <div>
-              <h3 className="card-title">Reflection & Journaling</h3>
-              <p className="card-subtitle">Qualitative habits and topic links</p>
+              <h3 className="card-title">Focus Highlights</h3>
+              <p className="card-subtitle">Where your attention went this period</p>
             </div>
           </div>
 
           {loading ? (
             <div className="skeleton-box" style={{ height: '160px' }} />
           ) : (
-            <div className="journal-analytics-content">
-              <div className="journal-stats-duo">
+            <div className="focus-highlights">
+              <div className="focus-stats-duo">
                 <div className="j-stat">
-                  <span className="val">{journalData?.journalCount || 0}</span>
-                  <span className="lbl">Entries Logged</span>
+                  <span className="val">{subjectData?.totalFormatted || '0m'}</span>
+                  <span className="lbl">Total Focus</span>
                 </div>
                 <div className="j-stat">
-                  <span className="val">{journalData?.journalStreak || 0} Days</span>
-                  <span className="lbl">Journal Streak</span>
+                  <span className="val">{overview?.currentStreak || 0} Days</span>
+                  <span className="lbl">Active Streak</span>
                 </div>
               </div>
 
-              <div className="top-journal-topics">
-                <span className="sub-lbl">Most Referenced Topics:</span>
+              <div className="top-focus-subjects">
+                <span className="sub-lbl">Most Studied Subjects:</span>
                 <div className="topic-tags-row">
-                  {journalData?.mostUsedTopics?.length > 0 ? (
-                    journalData.mostUsedTopics.map((t, i) => (
-                      <span key={i} className="journal-topic-tag">{t.name} ({t.count})</span>
+                  {subjectData?.subjects?.length > 0 ? (
+                    subjectData.subjects.slice(0, 6).map((s) => (
+                      <span key={s.subject} className="focus-subject-tag">{s.subject} ({s.formattedTime})</span>
                     ))
                   ) : (
-                    <span className="text-secondary" style={{ fontSize: '13px' }}>No linked topics logged yet.</span>
+                    <span className="text-secondary" style={{ fontSize: '13px' }}>No subject data yet.</span>
                   )}
                 </div>
               </div>
@@ -959,7 +935,6 @@ export default function AnalyticsPage() {
                     <div className="activity-icon">
                       {act.type === 'session' && <Clock size={14} />}
                       {act.type === 'todo' && <CheckCircle size={14} />}
-                      {act.type === 'journal' && <BookOpen size={14} />}
                     </div>
                     <div className="activity-info">
                       <span className="activity-title">{act.title}</span>
