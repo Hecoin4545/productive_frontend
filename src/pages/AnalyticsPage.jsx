@@ -1,14 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Clock, CheckCircle, Target, Award, Calendar,
-  TrendingUp, BarChart3, PieChart, Activity, Zap, Download,
-  Filter, ChevronDown, RefreshCw, ArrowUpRight, ArrowDownRight,
-  Brain, Layers, Sparkles, AlertCircle
+  Clock, CheckCircle, Zap, Download, ChevronDown,
+  PieChart, Activity, Filter, ArrowUpRight, ArrowDownRight,
+  Layers, Brain
 } from 'lucide-react';
 import {
-  getAnalyticsOverview, getAnalyticsStudyTime, getAnalyticsStudyTrend,
+  getAnalyticsOverview, getAnalyticsStudyTime,
   getAnalyticsSubjects, getAnalyticsLearningPaths, getAnalyticsTopics,
-  getAnalyticsTodos, getAnalyticsGoals, getAnalyticsHeatmap,
+  getAnalyticsTodos, getAnalyticsHeatmap,
   getAnalyticsHabits, getAnalyticsRecentActivity,
   getLearningPaths, exportAnalytics
 } from '../services/api';
@@ -24,7 +23,6 @@ export default function AnalyticsPage() {
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [selectedPathId, setSelectedPathId] = useState('all');
-  const [trendRange, setTrendRange] = useState('30d');
   const [heatmapMetric, setHeatmapMetric] = useState('studyTime'); // studyTime, tasks
 
   // State
@@ -33,12 +31,10 @@ export default function AnalyticsPage() {
 
   const [overview, setOverview] = useState(null);
   const [studyTimeData, setStudyTimeData] = useState(null);
-  const [studyTrendData, setStudyTrendData] = useState(null);
   const [subjectData, setSubjectData] = useState(null);
   const [pathData, setPathData] = useState([]);
   const [topicData, setTopicData] = useState([]);
   const [todoData, setTodoData] = useState(null);
-  const [goalData, setGoalData] = useState(null);
   const [heatmapData, setHeatmapData] = useState(null);
   const [habitData, setHabitData] = useState(null);
   const [recentActivities, setRecentActivities] = useState([]);
@@ -75,30 +71,25 @@ export default function AnalyticsPage() {
     Promise.all([
       getAnalyticsOverview(params),
       getAnalyticsStudyTime(params),
-      getAnalyticsStudyTrend({ ...params, period: trendRange }),
       getAnalyticsSubjects(params),
       getAnalyticsLearningPaths(params),
       getAnalyticsTopics(params),
       getAnalyticsTodos(params),
-      getAnalyticsGoals(params),
-      getAnalyticsHeatmap({ metric: heatmapMetric }),
+      getAnalyticsHeatmap({ ...params, metric: heatmapMetric }),
       getAnalyticsHabits(params),
       getAnalyticsRecentActivity()
     ])
       .then(([
-        overviewRes, studyTimeRes, trendRes, subjectRes,
-        pathRes, topicRes, todoRes, goalRes, heatmapRes,
-        habitRes, recentRes
+        overviewRes, studyTimeRes, subjectRes, pathRes,
+        topicRes, todoRes, heatmapRes, habitRes, recentRes
       ]) => {
         if (!isMounted) return;
         if (overviewRes.data?.success) setOverview(overviewRes.data.data);
         if (studyTimeRes.data?.success) setStudyTimeData(studyTimeRes.data.data);
-        if (trendRes.data?.success) setStudyTrendData(trendRes.data.data);
         if (subjectRes.data?.success) setSubjectData(subjectRes.data.data);
         if (pathRes.data?.success) setPathData(pathRes.data.data);
         if (topicRes.data?.success) setTopicData(topicRes.data.data);
         if (todoRes.data?.success) setTodoData(todoRes.data.data);
-        if (goalRes.data?.success) setGoalData(goalRes.data.data);
         if (heatmapRes.data?.success) setHeatmapData(heatmapRes.data.data);
         if (habitRes.data?.success) setHabitData(habitRes.data.data);
         if (recentRes.data?.success) setRecentActivities(recentRes.data.data);
@@ -109,7 +100,7 @@ export default function AnalyticsPage() {
       });
 
     return () => { isMounted = false; };
-  }, [dateRange, customFrom, customTo, selectedSubject, selectedPathId, trendRange, heatmapMetric]);
+  }, [dateRange, customFrom, customTo, selectedSubject, selectedPathId, heatmapMetric]);
 
   // Handle CSV/JSON export
   const handleExport = async (format) => {
@@ -143,11 +134,9 @@ export default function AnalyticsPage() {
   };
 
   // Format Helper
-  const formatSecsToHours = (secs) => {
-    if (!secs) return '0h';
-    const hrs = Math.round((secs / 3600) * 10) / 10;
-    return `${hrs}h`;
-  };
+  const rangeLabel = dateRange === 'custom'
+    ? (customFrom && customTo ? `${customFrom} to ${customTo}` : 'Custom range')
+    : ({ '7d': 'Last 7 days', '30d': 'Last 30 days', month: 'This month', year: 'This year' }[dateRange] || 'Last 30 days');
 
   return (
     <div className="analytics-page">
@@ -157,7 +146,7 @@ export default function AnalyticsPage() {
           <div className="page-header-eyebrow">WORKSPACE → PRODUCTIVITY ANALYTICS</div>
           <h1 className="page-header-title">Your Progress</h1>
           <p className="page-header-subtitle">
-            Understand how you're spending your learning time. Data-driven clarity without judgment.
+            {rangeLabel} · {selectedSubject === 'all' ? 'all subjects' : selectedSubject}
           </p>
         </div>
 
@@ -350,25 +339,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Card 4: Goals Completed */}
-        <div className="summary-card">
-          <div className="summary-card-header">
-            <span className="summary-card-title">GOALS COMPLETED</span>
-            <div className="summary-card-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-error)' }}>
-              <Target size={16} />
-            </div>
-          </div>
-          <div className="summary-card-value">
-            {loading ? <span className="skeleton-pulse">...</span> : `${overview?.goalsCompleted || 0} / ${overview?.totalGoals || 0}`}
-          </div>
-          <div className="summary-card-footer">
-            <span className="summary-card-subtext">
-              {overview?.totalGoals > 0 ? `${Math.round(((overview?.goalsCompleted || 0) / overview.totalGoals) * 100)}% completion rate` : 'No goals configured'}
-            </span>
-          </div>
-        </div>
-
-        {/* Card 5: Current Streak */}
+        {/* Card 4: Current Streak */}
         <div className="summary-card">
           <div className="summary-card-header">
             <span className="summary-card-title">CURRENT STREAK</span>
@@ -383,15 +354,14 @@ export default function AnalyticsPage() {
             <span className="summary-card-subtext">Best: {overview?.longestStreak || 0} days</span>
           </div>
         </div>
+      </div>
 
-        </div>
-
-      {/* ─── 15. & 16. Study Consistency & Heatmap ──────────── */}
+      {/* ─── Consistency Heatmap ──────────────────────────── */}
       <div className="analytics-card heatmap-card">
         <div className="card-header-row">
           <div>
-            <h3 className="card-title">Study Consistency & Heatmap</h3>
-            <p className="card-subtitle">Logged focus sessions and activity across days</p>
+            <h3 className="card-title">Consistency</h3>
+            <p className="card-subtitle">Every day in the selected range</p>
           </div>
 
           <div className="heatmap-metric-selector">
@@ -405,12 +375,11 @@ export default function AnalyticsPage() {
               className={`metric-btn ${heatmapMetric === 'tasks' ? 'active' : ''}`}
               onClick={() => setHeatmapMetric('tasks')}
             >
-              Tasks Completed
+              Tasks
             </button>
           </div>
         </div>
 
-        {/* GitHub Style Heatmap Grid */}
         <div className="heatmap-grid-container">
           {loading ? (
             <div className="skeleton-box" style={{ height: '140px', width: '100%' }} />
@@ -426,10 +395,10 @@ export default function AnalyticsPage() {
                   {hoveredTile?.dateKey === tile.dateKey && (
                     <div className="heatmap-tooltip">
                       <div className="tooltip-date">{tile.formattedDate}</div>
-                      <div className="tooltip-val">
-                        Study Time: {formatSecsToHours(tile.studySeconds)} ({tile.studySeconds > 0 ? Math.round(tile.studySeconds/60) + 'm' : '0m'})
+                      <div className="tooltip-val">{tile.formattedValue}</div>
+                      <div className="tooltip-sub">
+                        {heatmapMetric === 'tasks' ? 'Tasks' : 'Study Time'}: {tile.value}
                       </div>
-                      <div className="tooltip-sub">Tasks: {tile.tasksCount}</div>
                     </div>
                   )}
                 </div>
@@ -440,22 +409,10 @@ export default function AnalyticsPage() {
 
         <div className="heatmap-footer-row">
           <div className="heatmap-stat">
-            <span className="stat-value">{overview?.currentStreak || 0} Days</span>
-            <span className="stat-label">CURRENT STREAK</span>
-          </div>
-          <div className="heatmap-stat">
-            <span className="stat-value">{overview?.longestStreak || 0} Days</span>
-            <span className="stat-label">LONGEST STREAK</span>
-          </div>
-          <div className="heatmap-stat">
             <span className="stat-value">
               {heatmapData?.activeDays || 0} / {heatmapData?.totalDays || 0} Days ({heatmapData?.activeRatio || 0}%)
             </span>
-            <span className="stat-label">ACTIVE RATIO</span>
-          </div>
-          <div className="heatmap-stat">
-            <span className="stat-value">{habitData?.averageSessionFormatted || '0m'}</span>
-            <span className="stat-label">AVERAGE SESSION</span>
+            <span className="stat-label">ACTIVE DAYS</span>
           </div>
 
           <div className="heatmap-legend">
@@ -609,87 +566,6 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      {/* ─── 5. Study Time Trend ──────────────────────────── */}
-      <div className="analytics-card">
-        <div className="card-header-row">
-          <div>
-            <h3 className="card-title">Study Trend</h3>
-            <p className="card-subtitle">Cumulative learning duration trajectory over time</p>
-          </div>
-
-          <div className="range-pills">
-            <button
-              className={`range-pill ${trendRange === '7d' ? 'active' : ''}`}
-              onClick={() => setTrendRange('7d')}
-            >
-              7 Days
-            </button>
-            <button
-              className={`range-pill ${trendRange === '30d' ? 'active' : ''}`}
-              onClick={() => setTrendRange('30d')}
-            >
-              30 Days
-            </button>
-            <button
-              className={`range-pill ${trendRange === '90d' ? 'active' : ''}`}
-              onClick={() => setTrendRange('90d')}
-            >
-              90 Days
-            </button>
-            <button
-              className={`range-pill ${trendRange === '1y' ? 'active' : ''}`}
-              onClick={() => setTrendRange('1y')}
-            >
-              1 Year
-            </button>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="skeleton-box" style={{ height: '180px' }} />
-        ) : (
-          <div className="trend-line-chart">
-            {studyTrendData?.points?.length > 0 ? (
-              <svg viewBox="0 0 800 160" className="trend-svg">
-                {(() => {
-                  const pts = studyTrendData.points;
-                  const maxCumulative = Math.max(...pts.map(p => p.cumulativeHours), 5);
-                  const stepX = 780 / (pts.length - 1 || 1);
-
-                  const coords = pts.map((p, i) => ({
-                    x: 10 + i * stepX,
-                    y: 150 - (p.cumulativeHours / maxCumulative) * 130
-                  }));
-
-                  const pathD = coords.reduce((acc, pt, i) => i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`, '');
-                  const areaD = `${pathD} L ${coords[coords.length - 1].x} 150 L 10 150 Z`;
-
-                  return (
-                    <>
-                      <defs>
-                        <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.3" />
-                          <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-                      <path d={areaD} fill="url(#trendGradient)" />
-                      <path d={pathD} fill="none" stroke="var(--color-primary)" strokeWidth="3" />
-                      {coords.map((pt, i) => (
-                        <circle key={i} cx={pt.x} cy={pt.y} r="3" fill="var(--color-primary)" />
-                      ))}
-                    </>
-                  );
-                })()}
-              </svg>
-            ) : (
-              <div className="empty-chart-box">
-                <TrendingUp size={28} />
-                <p>No trend data calculated for this range.</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* ─── 7. & 9. Learning Path Activity & Progress ───── */}
       <div className="analytics-card">
@@ -714,8 +590,11 @@ export default function AnalyticsPage() {
                       <span className="lp-time-badge">{lp.formattedTime} logged</span>
                     </div>
                     <div className="lp-sub-details">
-                      <span>Topics: {lp.topicsStudiedCount} studied ({lp.topicsStudied.slice(0, 3).join(', ')}{lp.topicsStudied.length > 3 ? '...' : ''})</span>
-                      <span>Target: {lp.targetDate}</span>
+                      <span>
+                        {lp.sessionsCount || 0} sessions · {lp.topicsStudiedCount || 0} topics
+                        {lp.topicsStudied?.length ? ` (${lp.topicsStudied.slice(0, 3).join(', ')}${lp.topicsStudied.length > 3 ? '…' : ''})` : ''}
+                      </span>
+                      <span>{lp.tasksCompleted || 0}/{lp.totalTasks || 0} tasks done</span>
                     </div>
                   </div>
 
@@ -780,12 +659,12 @@ export default function AnalyticsPage() {
           )}
         </div>
 
-        {/* Right: Task Velocity / TODO Analytics */}
+        {/* Right: Task breakdown */}
         <div className="analytics-card">
           <div className="card-header-row">
             <div>
-              <h3 className="card-title">Task Velocity</h3>
-              <p className="card-subtitle">Task completion across learning assignments</p>
+              <h3 className="card-title">Tasks</h3>
+              <p className="card-subtitle">All your todo items right now</p>
             </div>
             <div className="card-badge">{todoData?.completionRate || 0}% Completed</div>
           </div>
@@ -808,30 +687,17 @@ export default function AnalyticsPage() {
                   <span className="lbl">Overdue</span>
                 </div>
               </div>
-
-              {/* Day activity bar */}
-              <div className="task-day-trend">
-                <span className="trend-title">Completed TODOs by Day:</span>
-                <div className="day-trend-bars">
-                  {todoData?.trend?.map((td, i) => (
-                    <div key={i} className="day-bar-col">
-                      <div className="day-bar-fill" style={{ height: `${Math.min(100, td.count * 20)}%` }} title={`${td.day}: ${td.count}`} />
-                      <span className="day-lbl">{td.day}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ─── 17. & 18. Study Habits & Time by Hour ─────────── */}
+      {/* ─── Study Habits ──────────────────────────────────── */}
       <div className="analytics-card">
         <div className="card-header-row">
           <div>
-            <h3 className="card-title">Study Habits & When You Study</h3>
-            <p className="card-subtitle">Factual patterns derived from session start timestamps</p>
+            <h3 className="card-title">Study Habits</h3>
+            <p className="card-subtitle">When your focus sessions actually happen</p>
           </div>
         </div>
 
@@ -874,124 +740,43 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* ─── 19. Recent Activity ───────────────────────────── */}
-      <div className="analytics-two-col">
-        {/* Left: Reflection placeholder */}
-        <div className="analytics-card">
-          <div className="card-header-row">
-            <div>
-              <h3 className="card-title">Focus Highlights</h3>
-              <p className="card-subtitle">Where your attention went this period</p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="skeleton-box" style={{ height: '160px' }} />
-          ) : (
-            <div className="focus-highlights">
-              <div className="focus-stats-duo">
-                <div className="j-stat">
-                  <span className="val">{subjectData?.totalFormatted || '0m'}</span>
-                  <span className="lbl">Total Focus</span>
-                </div>
-                <div className="j-stat">
-                  <span className="val">{overview?.currentStreak || 0} Days</span>
-                  <span className="lbl">Active Streak</span>
-                </div>
-              </div>
-
-              <div className="top-focus-subjects">
-                <span className="sub-lbl">Most Studied Subjects:</span>
-                <div className="topic-tags-row">
-                  {subjectData?.subjects?.length > 0 ? (
-                    subjectData.subjects.slice(0, 6).map((s) => (
-                      <span key={s.subject} className="focus-subject-tag">{s.subject} ({s.formattedTime})</span>
-                    ))
-                  ) : (
-                    <span className="text-secondary" style={{ fontSize: '13px' }}>No subject data yet.</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right: Recent Activity Timeline */}
-        <div className="analytics-card">
-          <div className="card-header-row">
-            <div>
-              <h3 className="card-title">Recent Activity</h3>
-              <p className="card-subtitle">Latest completed events across Arcstep</p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="skeleton-box" style={{ height: '160px' }} />
-          ) : (
-            <div className="recent-activity-list">
-              {recentActivities.length > 0 ? (
-                recentActivities.map((act) => (
-                  <div key={act.id} className="activity-item">
-                    <div className="activity-icon">
-                      {act.type === 'session' && <Clock size={14} />}
-                      {act.type === 'todo' && <CheckCircle size={14} />}
-                    </div>
-                    <div className="activity-info">
-                      <span className="activity-title">{act.title}</span>
-                      <span className="activity-sub">{act.subtitle}</span>
-                    </div>
-                    <span className="activity-time">
-                      {new Date(act.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div className="empty-chart-box">
-                  <Activity size={24} />
-                  <p>No recent activity recorded.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ─── Learning Insights & Observability ─────────────── */}
-      <div className="analytics-card insights-card">
+        {/* ─── Recent Activity ──────────────────────────────── */}
+      <div className="analytics-card">
         <div className="card-header-row">
           <div>
-            <h3 className="card-title">Learning Insights & Observability</h3>
-            <p className="card-subtitle">Factual observations generated from your study metrics without artificial judgment</p>
+            <h3 className="card-title">Recent Activity</h3>
+            <p className="card-subtitle">Latest completed sessions and tasks</p>
           </div>
-          <Sparkles size={16} style={{ color: 'var(--color-primary)' }} />
         </div>
 
-        <div className="insights-grid">
-          <div className="insight-box">
-            <span className="insight-lbl">VOLUME VELOCITY</span>
-            <p className="insight-desc">
-              Logged study time in this period total {overview?.totalStudyFormatted || '0m'} across {overview?.totalSessions || 0} session blocks.
-            </p>
+        {loading ? (
+          <div className="skeleton-box" style={{ height: '160px' }} />
+        ) : (
+          <div className="recent-activity-list">
+            {recentActivities.length > 0 ? (
+              recentActivities.map((act) => (
+                <div key={act.id} className="activity-item">
+                  <div className="activity-icon">
+                    {act.type === 'session' && <Clock size={14} />}
+                    {act.type === 'todo' && <CheckCircle size={14} />}
+                  </div>
+                  <div className="activity-info">
+                    <span className="activity-title">{act.title}</span>
+                    <span className="activity-sub">{act.subtitle}</span>
+                  </div>
+                  <span className="activity-time">
+                    {new Date(act.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="empty-chart-box">
+                <Activity size={24} />
+                <p>No recent activity recorded.</p>
+              </div>
+            )}
           </div>
-          <div className="insight-box">
-            <span className="insight-lbl">DISTRIBUTION BALANCE</span>
-            <p className="insight-desc">
-              Your primary focus area is {subjectData?.subjects?.[0]?.subject || 'General'}, representing {subjectData?.subjects?.[0]?.percentage || 0}% of study time.
-            </p>
-          </div>
-          <div className="insight-box">
-            <span className="insight-lbl">FLOW CONTINUITY</span>
-            <p className="insight-desc">
-              Your active streak is currently {overview?.currentStreak || 0} days, with an average session duration of {habitData?.averageSessionFormatted || '0m'}.
-            </p>
-          </div>
-          <div className="insight-box">
-            <span className="insight-lbl">PEAK CHRONOTYPE</span>
-            <p className="insight-desc">
-              Peak study intensity occurs on {habitData?.mostActiveDay || 'Weekdays'} around {habitData?.mostActiveTime || 'afternoon'}.
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -65,12 +65,10 @@ export const updateProfile = (data) => api.put('/users/profile', data);
 // Analytics
 export const getAnalyticsOverview = (params) => api.get('/analytics/overview', { params });
 export const getAnalyticsStudyTime = (params) => api.get('/analytics/study-time', { params });
-export const getAnalyticsStudyTrend = (params) => api.get('/analytics/study-trend', { params });
 export const getAnalyticsSubjects = (params) => api.get('/analytics/subjects', { params });
 export const getAnalyticsLearningPaths = (params) => api.get('/analytics/learning-paths', { params });
 export const getAnalyticsTopics = (params) => api.get('/analytics/topics', { params });
 export const getAnalyticsTodos = (params) => api.get('/analytics/todos', { params });
-export const getAnalyticsGoals = (params) => api.get('/analytics/goals', { params });
 export const getAnalyticsHeatmap = (params) => api.get('/analytics/heatmap', { params });
 export const getAnalyticsHabits = (params) => api.get('/analytics/habits', { params });
 export const getAnalyticsRecentActivity = (params) => api.get('/analytics/recent-activity', { params });

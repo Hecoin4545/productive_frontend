@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
   /* Color System - Arcstep Design */
@@ -888,6 +888,7 @@ img {
 .todo-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: 2px;
 }
@@ -903,6 +904,16 @@ img {
 .todo-duration {
   font-size: var(--font-xs);
   color: var(--color-text-tertiary);
+}
+
+.todo-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--font-xs);
+  font-weight: 500;
+  color: var(--color-primary);
+  white-space: nowrap;
 }
 
 .todo-priority {
@@ -1739,7 +1750,7 @@ img {
   padding-bottom: 4px;
 }
 
-/* ─── Timer Display ────────────── */
+/* â”€â”€â”€ Timer Display â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .timer-display-container {
   position: relative;
   width: 320px;
@@ -1845,7 +1856,7 @@ img {
   margin-top: 4px;
 }
 
-/* ─── Timer Controls ────────────── */
+/* â”€â”€â”€ Timer Controls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .timer-controls {
   display: flex;
   align-items: center;
@@ -1926,7 +1937,7 @@ img {
   background: var(--color-danger-light);
 }
 
-/* ─── Timer Setup / Active Info ────── */
+/* â”€â”€â”€ Timer Setup / Active Info â”€â”€â”€â”€â”€â”€ */
 .timer-setup,
 .timer-active-info,
 .timer-today-sessions {
@@ -2185,7 +2196,7 @@ img {
   text-align: center;
 }
 
-/* ─── Timer History ────────────── */
+/* â”€â”€â”€ Timer History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .timer-history {
   margin-top: var(--space-4);
 }
@@ -2335,7 +2346,7 @@ img {
   100% { background-position: -200% 0; }
 }
 
-/* ─── Completion Modal ────────────── */
+/* â”€â”€â”€ Completion Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .timer-modal-overlay {
   position: fixed;
   inset: 0;
@@ -2438,7 +2449,7 @@ img {
   padding: var(--space-4) var(--space-6) var(--space-6);
 }
 
-/* ─── Responsive ────────────────── */
+/* â”€â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 900px) {
   .timer-stats-row {
     grid-template-columns: repeat(2, 1fr);
@@ -2652,7 +2663,7 @@ img {
   outline: none;
 }
 
-/* ─── Summary Cards ──────────────────────── */
+/* â”€â”€â”€ Summary Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .analytics-summary-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -2748,7 +2759,7 @@ img {
   color: var(--color-error);
 }
 
-/* ─── Analytics Cards ────────────────────── */
+/* â”€â”€â”€ Analytics Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .analytics-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -2800,7 +2811,7 @@ img {
   }
 }
 
-/* ─── Heatmap ────────────────────────────── */
+/* â”€â”€â”€ Heatmap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .heatmap-metric-selector {
   display: flex;
   gap: 4px;
@@ -2923,7 +2934,7 @@ img {
   border-radius: 2px;
 }
 
-/* ─── Bar Chart ──────────────────────────── */
+/* â”€â”€â”€ Bar Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .bar-chart-container {
   min-height: 220px;
   display: flex;
@@ -3022,7 +3033,7 @@ img {
   margin-top: 2px;
 }
 
-/* ─── Donut Chart ────────────────────────── */
+/* â”€â”€â”€ Donut Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .donut-section {
   min-height: 220px;
 }
@@ -3122,19 +3133,7 @@ img {
   color: var(--color-text);
 }
 
-/* ─── Trend Graph ────────────────────────── */
-.trend-line-chart {
-  width: 100%;
-  height: 160px;
-}
-
-.trend-svg {
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-}
-
-/* ─── Learning Path Rows ─────────────────── */
+/* â”€â”€â”€ Trend Graph â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .learning-path-analytics-list {
   display: flex;
   flex-direction: column;
@@ -3214,7 +3213,7 @@ img {
   color: var(--color-text);
 }
 
-/* ─── Topics Ranking ─────────────────────── */
+/* â”€â”€â”€ Topics Ranking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .topics-ranking-list {
   display: flex;
   flex-direction: column;
@@ -3262,7 +3261,7 @@ img {
   background: var(--color-bg);
 }
 
-/* ─── Task Velocity ──────────────────────── */
+/* â”€â”€â”€ Task Velocity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .task-velocity-content {
   display: flex;
   flex-direction: column;
@@ -3291,49 +3290,8 @@ img {
 .task-stat-box .num { font-size: 1.25rem; font-weight: 800; }
 .task-stat-box .lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
 
-.task-day-trend {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
 
-.trend-title {
-  font-size: var(--font-xs);
-  color: var(--color-text-tertiary);
-  font-weight: 500;
-}
-
-.day-trend-bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  height: 60px;
-  gap: var(--space-2);
-}
-
-.day-bar-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-}
-
-.day-bar-fill {
-  width: 100%;
-  max-width: 20px;
-  background: var(--color-primary);
-  border-radius: 2px 2px 0 0;
-  margin-top: auto;
-}
-
-.day-lbl {
-  font-size: 10px;
-  color: var(--color-text-tertiary);
-  margin-top: 4px;
-}
-
-/* ─── Habits ─────────────────────────────── */
+/* â”€â”€â”€ Habits â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .habits-stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -3408,7 +3366,7 @@ img {
   margin-top: 4px;
 }
 
-/* ─── Reflection & Activity ──────────────── */
+/* â”€â”€â”€ Reflection & Activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .focus-stats-duo {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3484,7 +3442,7 @@ img {
 .activity-sub { font-size: 11px; color: var(--color-text-tertiary); }
 .activity-time { font-size: 11px; color: var(--color-text-tertiary); font-weight: 500; }
 
-/* ─── Insights ───────────────────────────── */
+/* â”€â”€â”€ Insights â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .insights-card {
   background: linear-gradient(135deg, var(--color-surface) 0%, rgba(99, 102, 241, 0.04) 100%);
   border: 1px solid var(--color-primary-light);
@@ -3754,7 +3712,7 @@ img {
   color: var(--color-primary);
 }
 
-/* ─── Learning Path Detail Hero & Roadmap ── */
+/* â”€â”€â”€ Learning Path Detail Hero & Roadmap â”€â”€ */
 .path-detail-hero {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -3992,7 +3950,7 @@ img {
   gap: 3px;
 }
 
-/* ─── Topic Drawer Workspace ──────────────── */
+/* â”€â”€â”€ Topic Drawer Workspace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .topic-drawer {
   background: var(--color-surface);
   border-radius: var(--radius-xl);
@@ -4121,7 +4079,7 @@ img {
   gap: var(--space-3);
 }
 
-/* ─── Top 4 Dashboard Cards (Matching Screenshot!) ──── */
+/* â”€â”€â”€ Top 4 Dashboard Cards (Matching Screenshot!) â”€â”€â”€â”€ */
 .resources-dash-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -4184,7 +4142,7 @@ img {
   color: var(--color-text-secondary);
 }
 
-/* ─── Main Resources Layout: Sidebar + Canvas ──── */
+/* â”€â”€â”€ Main Resources Layout: Sidebar + Canvas â”€â”€â”€â”€ */
 .resources-main-layout {
   display: grid;
   grid-template-columns: 260px 1fr;
@@ -4301,7 +4259,7 @@ img {
   color: var(--color-text-tertiary);
 }
 
-/* ─── Canvas Area ────────────────────────── */
+/* â”€â”€â”€ Canvas Area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .resources-canvas {
   display: flex;
   flex-direction: column;
@@ -4342,7 +4300,7 @@ img {
   color: var(--color-primary);
 }
 
-/* ─── Pinned Cards Section (Matching Screenshot) ──── */
+/* â”€â”€â”€ Pinned Cards Section (Matching Screenshot) â”€â”€â”€â”€ */
 .pinned-resources-section {
   display: flex;
   flex-direction: column;
@@ -4438,7 +4396,7 @@ img {
   border-radius: 2px;
 }
 
-/* ─── Main Resources Grid/List ───────────── */
+/* â”€â”€â”€ Main Resources Grid/List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .resources-grid-layout {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -5081,7 +5039,7 @@ img {
 }
 
 /* ========================================== */
-/* LEARNING EMPTY STATE — PREMIUM             */
+/* LEARNING EMPTY STATE â€” PREMIUM             */
 /* ========================================== */
 .learning-empty-card {
   position: relative;

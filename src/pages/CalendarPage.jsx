@@ -4,8 +4,11 @@ import PageHeader from '../components/PageHeader.jsx';
 import { getTodos, createTodo, updateTodo, deleteTodo } from '../services/api.js';
 import '../index.css';
 
-const HOURS = Array.from({ length: 15 }, (_, i) => i + 8); // 8 AM to 10 PM
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // full 24h day (00:00 - 23:00)
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const LAST_HOUR = HOURS[HOURS.length - 1];
+
+const formatHour = (h) => `${`${h}`.padStart(2, '0')}:00`;
 
 const toDateKey = (date) => {
   const d = new Date(date);
@@ -312,7 +315,7 @@ export default function CalendarPage() {
                 <div style={{ width: '60px', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column' }}>
                   {HOURS.map(h => (
                     <div key={h} style={{ height: '60px', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '8px 0', fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
-                      {h}:00
+                      {formatHour(h)}
                     </div>
                   ))}
                 </div>
@@ -328,14 +331,13 @@ export default function CalendarPage() {
                       onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         const y = e.clientY - rect.top;
-                        const hour = Math.floor(y / 60) + HOURS[0];
-                        openTaskForm(toDateKey(d), `${hour.toString().padStart(2, '0')}:00`);
+                        const hour = Math.min(Math.floor(y / 60) + HOURS[0], LAST_HOUR);
+                        openTaskForm(toDateKey(d), formatHour(hour));
                       }}
                     >
                       {dayTodos.map((todo) => {
                         const dueDate = new Date(todo.dueDate);
                         const startHour = dueDate.getHours() + dueDate.getMinutes() / 60;
-                        if (startHour < HOURS[0] || startHour > HOURS[HOURS.length - 1]) return null;
                         
                         const topOffset = (startHour - HOURS[0]) * 60;
                         const height = getDurationMinutes(todo);
@@ -416,7 +418,7 @@ export default function CalendarPage() {
                 <div style={{ width: '70px', borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column' }}>
                   {HOURS.map(h => (
                     <div key={h} style={{ height: '64px', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '8px 0', fontSize: '12px', color: 'var(--color-text-tertiary)' }}>
-                      {`${h}`.padStart(2, '0')}:00
+                      {formatHour(h)}
                     </div>
                   ))}
                 </div>
@@ -426,14 +428,13 @@ export default function CalendarPage() {
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const y = e.clientY - rect.top;
-                    const hour = Math.floor(y / 64) + HOURS[0];
-                    openTaskForm(toDateKey(currentDate), `${Math.min(hour, HOURS[HOURS.length - 1]).toString().padStart(2, '0')}:00`);
+                    const hour = Math.min(Math.floor(y / 64) + HOURS[0], LAST_HOUR);
+                    openTaskForm(toDateKey(currentDate), formatHour(hour));
                   }}
                 >
                   {dayTodos.map(todo => {
                     const dueDate = new Date(todo.dueDate);
                     const startHour = dueDate.getHours() + dueDate.getMinutes() / 60;
-                    if (startHour < HOURS[0] || startHour > HOURS[HOURS.length - 1]) return null;
 
                     const topOffset = (startHour - HOURS[0]) * 64;
                     const height = Math.max(getDurationMinutes(todo), 28);
@@ -503,17 +504,24 @@ export default function CalendarPage() {
           {view === 'month' && (
             <div style={{ minWidth: '760px', display: 'flex', flexDirection: 'column' }}>
               {/* Weekday Header */}
-              <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', borderBottom: '1px solid var(--color-border)' }}>
                 {DAYS.map(d => (
-                  <div key={d} style={{ flex: 1, textAlign: 'center', padding: '10px 4px', fontSize: '12px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
+                  <div key={d} style={{ minWidth: 0, textAlign: 'center', padding: '10px 4px', fontSize: '12px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 600 }}>
                     {d}
                   </div>
                 ))}
               </div>
 
               {/* Month Grid */}
-              <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-                {monthCells.map(({ date: cellDate, inMonth }) => {
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                  gridAutoRows: '128px',
+                  gridAutoFlow: 'row'
+                }}
+              >
+                {monthCells.map(({ date: cellDate, inMonth }, cellIndex) => {
                   const cellKey = toDateKey(cellDate);
                   const cellTodos = todos
                     .filter(t => t.dueDate && toDateKey(t.dueDate) === cellKey)
@@ -527,11 +535,12 @@ export default function CalendarPage() {
                     <div
                       key={cellKey}
                       style={{
-                        flex: '0 0 14.2857%',
-                        minHeight: '110px',
+                        minWidth: 0,
+                        height: '128px',
+                        overflow: 'hidden',
                         padding: '6px',
-                        borderRight: '1px solid var(--color-border)',
-                        borderBottom: '1px solid var(--color-border)',
+                        borderRight: cellDate.getDay() === 6 ? 'none' : '1px solid var(--color-border)',
+                        borderBottom: cellIndex < 35 ? '1px solid var(--color-border)' : 'none',
                         backgroundColor: inMonth ? 'transparent' : 'var(--color-bg-secondary)',
                         opacity: inMonth ? 1 : 0.55,
                         display: 'flex',
@@ -544,7 +553,7 @@ export default function CalendarPage() {
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = inMonth ? 'transparent' : 'var(--color-bg-secondary)'; }}
                       onClick={() => { setCurrentDate(cellDate); setView('day'); }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                         <span style={{
                           fontSize: '13px',
                           fontWeight: isToday ? 700 : 500,
@@ -560,7 +569,7 @@ export default function CalendarPage() {
                           {cellDate.getDate()}
                         </span>
                         {cellTodos.length > 0 && (
-                          <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)' }} title={`${totalMinutes} minutes scheduled`}>
+                          <span style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }} title={`${totalMinutes} minutes scheduled`}>
                             {(totalMinutes / 60).toFixed(totalMinutes % 60 === 0 ? 0 : 1)}h
                           </span>
                         )}
@@ -574,6 +583,7 @@ export default function CalendarPage() {
                           <div
                             key={todo._id}
                             style={{
+                              flexShrink: 0,
                               fontSize: '11px',
                               backgroundColor: `${bgColor}20`,
                               borderLeft: `3px solid ${bgColor}`,
@@ -600,7 +610,7 @@ export default function CalendarPage() {
 
                       {overflow > 0 && (
                         <div
-                          style={{ fontSize: '11px', color: 'var(--color-text-secondary)', paddingLeft: '4px' }}
+                          style={{ flexShrink: 0, fontSize: '11px', color: 'var(--color-text-secondary)', paddingLeft: '4px', cursor: 'pointer' }}
                           onClick={(e) => { e.stopPropagation(); setCurrentDate(cellDate); setView('day'); }}
                         >
                           +{overflow} more
