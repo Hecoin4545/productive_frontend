@@ -3,22 +3,15 @@ import { ArrowRight } from 'lucide-react';
 
 export default function FocusCard({ learningPath, nextSession }) {
   const navigate = useNavigate();
+  const path = learningPath || null;
+  const currentModule = path?.currentModule || '';
+  const topicStat = path && path.totalTopics > 0
+    ? { done: path.completedTopics, total: path.totalTopics }
+    : null;
 
-  const path = learningPath || {
-    currentModule: 'Dynamic Programming',
-    currentTopic: 'Memoization & Tabulation',
-    progress: 40,
-  };
-
-  const session = nextSession || {
-    time: '4:00 PM',
-    title: 'Solve DP problems',
-    duration: '45 min'
-  };
-
-  // Calculate module progress
-  const moduleTopicsTotal = 5;
-  const moduleTopicsDone = 2;
+  const moduleProgress = path && path.totalModules > 0
+    ? { done: path.completedModules, total: path.totalModules }
+    : null;
 
   return (
     <div className="focus-card fade-in">
@@ -26,28 +19,64 @@ export default function FocusCard({ learningPath, nextSession }) {
         <span className="card-eyebrow">Today's Focus</span>
       </div>
 
-      <div className="focus-current">
-        <div className="focus-current-label">Currently learning</div>
-        <div className="focus-current-topic">{path.currentModule || path.currentTopic}</div>
-      </div>
-
-      <div className="focus-progress">
-        <div className="focus-progress-bar">
-          <div
-            className="focus-progress-fill"
-            style={{ width: `${(moduleTopicsDone / moduleTopicsTotal) * 100}%` }}
-          />
+      {currentModule ? (
+        <div className="focus-current">
+          <div className="focus-current-label">Currently learning</div>
+          <div className="focus-current-topic">{currentModule}</div>
         </div>
-        <span className="focus-progress-text">
-          {moduleTopicsDone} / {moduleTopicsTotal} topics
-        </span>
-      </div>
+      ) : (
+        <div className="focus-current">
+          <div className="focus-current-label">Currently learning</div>
+          <div className="focus-current-topic" style={{ color: 'var(--color-text-tertiary)' }}>
+            No active module
+          </div>
+        </div>
+      )}
 
-      <div className="focus-next">
-        <div className="focus-next-label">Next session</div>
-        <div className="focus-next-title">{session.time} — {session.title}</div>
-        <div className="focus-next-time">Duration: {session.duration}</div>
-      </div>
+      {moduleProgress && (
+        <div className="focus-progress">
+          <div className="focus-progress-bar">
+            <div
+              className="focus-progress-fill"
+              style={{ width: `${(moduleProgress.done / moduleProgress.total) * 100}%` }}
+            />
+          </div>
+          <span className="focus-progress-text">
+            {moduleProgress.done} / {moduleProgress.total} modules
+          </span>
+        </div>
+      )}
+
+      {topicStat && (
+        <div className="focus-progress">
+          <div className="focus-progress-bar">
+            <div
+              className="focus-progress-fill"
+              style={{ width: `${(topicStat.done / topicStat.total) * 100}%` }}
+            />
+          </div>
+          <span className="focus-progress-text">
+            {topicStat.done} / {topicStat.total} topics
+          </span>
+        </div>
+      )}
+
+      {nextSession ? (
+        <div className="focus-next">
+          <div className="focus-next-label">Next session</div>
+          <div className="focus-next-title">{nextSession.time} — {nextSession.title}</div>
+          {nextSession.duration && (
+            <div className="focus-next-time">Duration: {nextSession.duration}</div>
+          )}
+        </div>
+      ) : (
+        <div className="focus-next">
+          <div className="focus-next-label">Next session</div>
+          <div className="focus-next-title" style={{ color: 'var(--color-text-tertiary)' }}>
+            Nothing scheduled ahead
+          </div>
+        </div>
+      )}
 
       <div className="focus-action" onClick={() => navigate('/timer')}>
         Start timer <ArrowRight size={14} />

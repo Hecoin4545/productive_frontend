@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Clock, CheckSquare, TrendingUp, Flame } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getDashboardData } from '../services/api.js';
@@ -11,67 +11,6 @@ import StudyActivity from '../components/StudyActivity.jsx';
 import StudyChart from '../components/StudyChart.jsx';
 import LearningProgress from '../components/LearningProgress.jsx';
 import GoalsOverview from '../components/GoalsOverview.jsx';
-
-// Mock data fallback
-const mockData = {
-  todos: [
-    { _id: 'm1', title: 'Solve 5 Dynamic Programming problems', category: 'DSA', learningPathName: 'Data Structures & Algorithms', priority: 'high', estimatedDuration: 90, completed: false },
-    { _id: 'm2', title: 'Complete Binary Trees lecture', category: 'DSA', learningPathName: 'Data Structures & Algorithms', priority: 'medium', estimatedDuration: 60, completed: false },
-    { _id: 'm3', title: 'Revise regression notes', category: 'Machine Learning', learningPathName: 'Machine Learning', priority: 'medium', estimatedDuration: 45, completed: false },
-    { _id: 'm4', title: 'Work on portfolio project', category: 'Web Development', learningPathName: 'Web Development', priority: 'low', estimatedDuration: 60, completed: false },
-    { _id: 'm5', title: 'Read system design chapter', category: 'System Design', learningPathName: 'System Design', priority: 'medium', estimatedDuration: 40, completed: false },
-    { _id: 'm6', title: 'Solve 3 Codeforces problems', category: 'DSA', learningPathName: 'Data Structures & Algorithms', priority: 'high', estimatedDuration: 75, completed: true, completedAt: new Date().toISOString() },
-    { _id: 'm7', title: 'Review ML lecture slides', category: 'Machine Learning', learningPathName: 'Machine Learning', priority: 'low', estimatedDuration: 30, completed: true, completedAt: new Date().toISOString() },
-    { _id: 'm8', title: 'Practice SQL queries', category: 'Web Development', learningPathName: 'Web Development', priority: 'medium', estimatedDuration: 35, completed: true, completedAt: new Date().toISOString() },
-  ],
-  goals: [
-    { _id: 'g1', title: 'Complete DP lecture', completed: true },
-    { _id: 'g2', title: 'Solve 3 problems', completed: true },
-    { _id: 'g3', title: 'Finish ML notes', completed: false },
-    { _id: 'g4', title: 'Read system design chapter', completed: false },
-  ],
-  studySessions: [
-    {
-      _id: 's1', subject: 'Data Structures & Algorithms', topic: 'Dynamic Programming', duration: 90,
-      startTime: new Date(new Date().setHours(9, 0, 0, 0)).toISOString(),
-      endTime: new Date(new Date().setHours(10, 30, 0, 0)).toISOString(),
-    },
-    {
-      _id: 's2', subject: 'Machine Learning', topic: 'Regression', duration: 45,
-      startTime: new Date(new Date().setHours(11, 30, 0, 0)).toISOString(),
-      endTime: new Date(new Date().setHours(12, 15, 0, 0)).toISOString(),
-    },
-    {
-      _id: 's3', subject: 'Competitive Programming', topic: 'Codeforces Practice', duration: 90,
-      startTime: new Date(new Date().setHours(16, 0, 0, 0)).toISOString(),
-      endTime: new Date(new Date().setHours(17, 30, 0, 0)).toISOString(),
-    },
-  ],
-  learningPaths: [
-    { _id: 'lp1', title: 'Data Structures & Algorithms', description: 'Build strong problem-solving fundamentals through consistent practice.', progress: 78, completedTopics: 42, totalTopics: 54, currentModule: 'Dynamic Programming', nextMilestone: 'Complete 15 medium-level problems', color: '#6C63FF' },
-    { _id: 'lp2', title: 'Machine Learning', progress: 52, color: '#22C55E' },
-    { _id: 'lp3', title: 'Web Development', progress: 64, color: '#F59E0B' },
-    { _id: 'lp4', title: 'System Design', progress: 31, color: '#EF4444' },
-  ],
-  stats: {
-    studyTime: 225,
-    tasksCompleted: 3,
-    totalTasks: 8,
-    goalsCompleted: 2,
-    totalGoals: 4,
-    streak: 12,
-    overallProgress: 56,
-  },
-  weeklyStudy: [
-    { day: 'Mon', hours: 2 },
-    { day: 'Tue', hours: 4 },
-    { day: 'Wed', hours: 3 },
-    { day: 'Thu', hours: 5 },
-    { day: 'Fri', hours: 4 },
-    { day: 'Sat', hours: 6 },
-    { day: 'Sun', hours: 3 },
-  ],
-};
 
 function formatStudyTime(minutes) {
   const h = Math.floor(minutes / 60);
@@ -90,10 +29,28 @@ function formatDate() {
   });
 }
 
+const EMPTY_DATA = {
+  todos: [],
+  goals: [],
+  studySessions: [],
+  learningPaths: [],
+  stats: {
+    studyTime: 0,
+    tasksCompleted: 0,
+    totalTasks: 0,
+    goalsCompleted: 0,
+    totalGoals: 0,
+    streak: 0,
+    overallProgress: 0,
+  },
+  weeklyStudy: [],
+};
+
 export default function TodayPage() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
     loadDashboard();
@@ -102,27 +59,43 @@ export default function TodayPage() {
   const loadDashboard = async () => {
     try {
       const res = await getDashboardData();
-      if (res.data?.success && res.data.data) {
-        // Ensure arrays are properly initialized
-        const apiData = res.data.data;
-        setData({
-          todos: Array.isArray(apiData.todos) ? apiData.todos : [],
-          goals: Array.isArray(apiData.goals) ? apiData.goals : [],
-          studySessions: Array.isArray(apiData.studySessions) ? apiData.studySessions : [],
-          learningPaths: Array.isArray(apiData.learningPaths) ? apiData.learningPaths : [],
-          stats: apiData.stats || mockData.stats,
-          weeklyStudy: Array.isArray(apiData.weeklyStudy) ? apiData.weeklyStudy : mockData.weeklyStudy
-        });
-      } else {
-        setData(mockData);
-      }
+      if (!res.data?.success) throw new Error('Dashboard request failed');
+      const apiData = res.data.data || {};
+      setData({
+        todos: Array.isArray(apiData.todos) ? apiData.todos : [],
+        goals: Array.isArray(apiData.goals) ? apiData.goals : [],
+        studySessions: Array.isArray(apiData.studySessions) ? apiData.studySessions : [],
+        learningPaths: Array.isArray(apiData.learningPaths) ? apiData.learningPaths : [],
+        stats: { ...EMPTY_DATA.stats, ...(apiData.stats || {}) },
+        weeklyStudy: Array.isArray(apiData.weeklyStudy) ? apiData.weeklyStudy : []
+      });
+      setLoadError(false);
     } catch (err) {
-      // Fallback to mock data if API fails
-      console.log('Using mock data (API unavailable)');
-      setData(mockData);
+      console.error('Failed to load dashboard', err);
+      setData(EMPTY_DATA);
+      setLoadError(true);
     }
     setLoading(false);
   };
+
+  const todos = data?.todos || EMPTY_DATA.todos;
+
+  // Next upcoming calendar session; nothing invented when the day is clear
+  const nextSession = useMemo(() => {
+    const now = Date.now();
+    const upcoming = todos
+      .filter(t => !t.completed && t.dueDate && new Date(t.dueDate).getTime() >= now)
+      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0];
+
+    if (!upcoming) return null;
+    const due = new Date(upcoming.dueDate);
+    const mins = parseInt(upcoming.estimatedDuration, 10);
+    return {
+      time: due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      title: upcoming.title,
+      duration: Number.isFinite(mins) && mins > 0 ? `${mins} min` : ''
+    };
+  }, [todos]);
 
   if (loading) {
     return (
@@ -132,23 +105,29 @@ export default function TodayPage() {
     );
   }
 
-  const d = data || mockData;
-  const stats = d.stats || mockData.stats;
-  const currentPath = (Array.isArray(d.learningPaths) && d.learningPaths.length > 0)
-    ? d.learningPaths[0]
-    : mockData.learningPaths[0];
+  const d = data || EMPTY_DATA;
+  const stats = d.stats;
+  const learningPaths = d.learningPaths;
+  const currentPath = learningPaths.find(p => p.status === 'active') || learningPaths[0] || null;
+  const hasPaths = learningPaths.length > 0;
 
   return (
     <div className="stagger">
       <PageHeader
         eyebrow="One step at a time"
-        title={`Make today count, ${user?.name || 'Het'}.`}
+        title={user?.name ? `Make today count, ${user.name}.` : 'Make today count.'}
         subtitle="A place for the work you do today and the person you're becoming."
         date={formatDate()}
       />
 
+      {loadError && (
+        <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: 'var(--space-4)' }}>
+          Could not load your dashboard. Is the server running?
+        </div>
+      )}
+
       {/* Hero - Current Learning Path */}
-      <HeroCard learningPath={currentPath} />
+      {currentPath && <HeroCard learningPath={currentPath} />}
 
       {/* Stats Grid */}
       <div className="stats-grid stagger">
@@ -157,8 +136,7 @@ export default function TodayPage() {
           iconBg="var(--color-primary-light)"
           iconColor="var(--color-primary)"
           value={formatStudyTime(stats.studyTime)}
-          label="Study time"
-          change="+42 min"
+          label="Study time today"
         />
         <StatCard
           icon={CheckSquare}
@@ -171,14 +149,14 @@ export default function TodayPage() {
           icon={TrendingUp}
           iconBg="var(--color-warning-light)"
           iconColor="var(--color-warning-text)"
-          value={`${stats.overallProgress}%`}
+          value={hasPaths ? `${stats.overallProgress}%` : '—'}
           label="Learning progress"
         />
         <StatCard
           icon={Flame}
           iconBg="#FEF2F2"
           iconColor="#EF4444"
-          value={`${stats.streak} days`}
+          value={`${stats.streak} ${stats.streak === 1 ? 'day' : 'days'}`}
           label="Current streak"
         />
       </div>
@@ -186,23 +164,23 @@ export default function TodayPage() {
       {/* Main Dashboard Grid */}
       <div className="dashboard-grid">
         {/* Left column: Todos */}
-        <TodoOverview todos={Array.isArray(d.todos) ? d.todos : mockData.todos} />
+        <TodoOverview todos={d.todos} />
         {/* Right column: Focus */}
-        <FocusCard learningPath={currentPath} />
+        <FocusCard learningPath={currentPath} nextSession={nextSession} />
       </div>
 
       <div className="dashboard-grid">
         {/* Left column: Study Activity */}
-        <StudyActivity sessions={Array.isArray(d.studySessions) ? d.studySessions : mockData.studySessions} />
+        <StudyActivity sessions={d.studySessions} />
         {/* Right column: Weekly Chart */}
-        <StudyChart weeklyData={Array.isArray(d.weeklyStudy) ? d.weeklyStudy : mockData.weeklyStudy} />
+        <StudyChart weeklyData={d.weeklyStudy} />
       </div>
 
       <div className="dashboard-grid">
         {/* Left column: Learning Progress */}
-        <LearningProgress paths={Array.isArray(d.learningPaths) ? d.learningPaths : mockData.learningPaths} />
+        <LearningProgress paths={learningPaths} />
         {/* Right column: Goals */}
-        <GoalsOverview goals={Array.isArray(d.goals) ? d.goals : mockData.goals} />
+        <GoalsOverview goals={d.goals} />
       </div>
     </div>
   );

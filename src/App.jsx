@@ -5,7 +5,6 @@ import AppLayout from './components/AppLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import TodayPage from './pages/TodayPage.jsx';
-import PlaceholderPage from './pages/PlaceholderPage.jsx';
 import CalendarPage from './pages/CalendarPage.jsx';
 import TimerPage from './pages/TimerPage.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
@@ -57,13 +56,6 @@ export default function App() {
               <Route path="resources" element={<ResourcesPage />} />
               <Route path="timer" element={<TimerPage />} />
               <Route path="analytics" element={<AnalyticsPage />} />
-              <Route path="settings" element={
-                <PlaceholderPage
-                  title="Settings"
-                  description="Customize your Arcstep experience. Manage your profile, preferences, and application settings."
-                  icon="Settings"
-                />
-              } />
             </Route>
             <Route path="*" element={<Navigate to="/today" replace />} />
           </Routes>

@@ -1,20 +1,30 @@
+function formatHours(hours) {
+  const h = Number(hours) || 0;
+  if (h === 0) return '0m';
+  if (h < 1) return `${Math.round(h * 60)}m`;
+  if (Number.isInteger(h)) return `${h}h`;
+  return `${h.toFixed(1)}h`;
+}
+
 export default function StudyChart({ weeklyData }) {
-  const defaultData = [
-    { day: 'Mon', hours: 2 },
-    { day: 'Tue', hours: 4 },
-    { day: 'Wed', hours: 3 },
-    { day: 'Thu', hours: 5 },
-    { day: 'Fri', hours: 4 },
-    { day: 'Sat', hours: 6 },
-    { day: 'Sun', hours: 3 },
-  ];
+  // No invented bars - render the week exactly as the server reported it
+  const data = Array.isArray(weeklyData) ? weeklyData : [];
 
-  // Ensure weeklyData is always an array
-  const data = Array.isArray(weeklyData) && weeklyData.length > 0 ? weeklyData : defaultData;
+  if (data.length === 0) {
+    return (
+      <div className="card fade-in">
+        <div className="card-header">
+          <h3 className="card-title">Weekly study</h3>
+          <span className="card-eyebrow">This week</span>
+        </div>
+        <p style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-sm)', padding: 'var(--space-4) 0' }}>
+          No study data for this week yet.
+        </p>
+      </div>
+    );
+  }
 
-  const maxHours = Math.max(...data.map(d => d.hours), 1);
-  const todayIndex = new Date().getDay(); // 0=Sun, 1=Mon...
-  const todayMapped = todayIndex === 0 ? 6 : todayIndex - 1; // Map to Mon=0
+  const maxHours = Math.max(...data.map(d => Number(d.hours) || 0), 1);
 
   return (
     <div className="card fade-in">
@@ -23,18 +33,21 @@ export default function StudyChart({ weeklyData }) {
         <span className="card-eyebrow">This week</span>
       </div>
       <div className="weekly-chart">
-        {data.map((item, i) => (
-          <div key={item.day} className="weekly-bar-wrapper">
-            <span className="weekly-bar-value">{item.hours}h</span>
-            <div className="weekly-bar-container">
-              <div
-                className={`weekly-bar ${i === todayMapped ? 'today' : ''}`}
-                style={{ height: `${(item.hours / maxHours) * 100}%` }}
-              />
+        {data.map((item, i) => {
+          const hours = Number(item.hours) || 0;
+          return (
+            <div key={item.date || item.day || i} className="weekly-bar-wrapper">
+              <span className="weekly-bar-value">{formatHours(hours)}</span>
+              <div className="weekly-bar-container">
+                <div
+                  className={`weekly-bar ${item.isToday ? 'today' : ''}`}
+                  style={{ height: `${(hours / maxHours) * 100}%` }}
+                />
+              </div>
+              <span className="weekly-bar-label">{item.day}</span>
             </div>
-            <span className="weekly-bar-label">{item.day}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

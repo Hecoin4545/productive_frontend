@@ -89,6 +89,7 @@ export default function TimerPage() {
     isTimerComplete, isBreak, sessionConfig, pomodoroConfig, elapsed, targetDuration,
     startTimer, pauseTimer, resumeTimer, stopTimer, resetTimer,
     setMode, setTargetDuration, setSessionConfig, setPomodoroConfig,
+    summaryOpen, setSummaryOpen,
     TIMER_MODES, TIMER_STATES, POMODORO_PRESETS
   } = timer;
 
@@ -118,6 +119,76 @@ export default function TimerPage() {
   const [problemsCompleted, setProblemsCompleted] = useState(0);
   const [sessionNotes, setSessionNotes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Manual entry — for study you completed without the timer running
+  const [showManual, setShowManual] = useState(false);
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState('');
+  const [manual, setManual] = useState(() => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return {
+      subject: 'College',
+      learningPathId: '',
+      moduleName: '',
+      topicName: '',
+      task: '',
+      hours: 1,
+      minutes: 0,
+      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      startTime: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      notes: ''
+    };
+  });
+
+  const setManualField = (key, value) =>
+    setManual(prev => ({ ...prev, [key]: value }));
+
+  const manualDurationSeconds =
+    (Number(manual.hours) || 0) * 3600 + (Number(manual.minutes) || 0) * 60;
+
+  const handleSaveManual = async () => {
+    if (manualDurationSeconds <= 0) {
+      setManualError('Enter how long you studied.');
+      return;
+    }
+    if (!manual.date || !manual.startTime) {
+      setManualError('Pick the date and time you studied.');
+      return;
+    }
+
+    setManualSaving(true);
+    setManualError('');
+    try {
+      const start = new Date(`${manual.date}T${manual.startTime}`);
+      if (Number.isNaN(start.getTime())) throw new Error('Invalid date');
+      const end = new Date(start.getTime() + manualDurationSeconds * 1000);
+      const path = learningPaths.find(p => p._id === manual.learningPathId);
+
+      await createStudySession({
+        subject: manual.subject || 'General',
+        learningPathId: path?._id || null,
+        moduleName: manual.moduleName,
+        topicName: manual.topicName,
+        topic: manual.topicName || manual.moduleName,
+        task: manual.task,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        duration: manualDurationSeconds,
+        mode: 'custom',
+        notes: manual.notes,
+        date: start.toISOString()
+      });
+
+      setShowManual(false);
+      loadData();
+    } catch (err) {
+      console.error('Failed to log manual session:', err);
+      setManualError('Could not save that session. Check the date and time.');
+    } finally {
+      setManualSaving(false);
+    }
+  };
 
   // History & stats
   const [recentSessions, setRecentSessions] = useState([]);
@@ -219,6 +290,7 @@ export default function TimerPage() {
     const result = stopTimer();
     setCompletionData(result);
     setShowCompletion(true);
+    setSummaryOpen(true);
     setAccomplishments('');
     setLearned('');
     setProblemsCompleted(0);
@@ -250,6 +322,7 @@ export default function TimerPage() {
         date: completionData.startTime || new Date().toISOString()
       });
       setShowCompletion(false);
+      setSummaryOpen(false);
       setCompletionData(null);
       loadData();
     } catch (err) {
@@ -261,6 +334,7 @@ export default function TimerPage() {
 
   const handleDiscard = () => {
     setShowCompletion(false);
+    setSummaryOpen(false);
     setCompletionData(null);
   };
 
@@ -278,6 +352,155 @@ export default function TimerPage() {
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringOffset = ringCircumference * (1 - progressPercent);
 
+  // Shown in both the focus stage and the normal page so finishing a
+  // session from fullscreen still lets you write it up and save.
+  const completionModal = showCompletion && completionData && (
+    <div className="timer-modal-overlay" onClick={handleDiscard}>
+      <div className="timer-modal" onClick={e => e.stopPropagation()}>
+        <button className="timer-modal-close" onClick={handleDiscard}>
+          <X size={18} />
+        </button>
+
+        <div className="timer-modal-header">
+          <div className="timer-modal-check">
+            <CheckCircle2 size={40} />
+          </div>
+          <h2 className="timer-modal-title">Session Complete</h2>
+          <div className="timer-modal-duration">{formatDuration(completionData.duration)}</div>
+          <div className="timer-modal-subject">
+            {completionData.moduleName || completionData.topicName || completionData.subject}
+          </div>
+        </div>
+
+        <div className="timer-modal-body">
+          <div className="timer-setup-field">
+            <label className="form-label">What did you accomplish?</label>
+            <textarea
+              className="form-input timer-textarea"
+              placeholder="Write a quick summary of what you worked on…"
+              value={accomplishments}
+              onChange={e => setAccomplishments(e.target.value)}
+              rows={3}
+            />
+          </div>
+
+          <div className="timer-setup-field">
+            <label className="form-label">What did you learn?</label>
+            <textarea
+              className="form-input timer-textarea"
+              placeholder="Key concepts or insights…"
+              value={learned}
+              onChange={e => setLearned(e.target.value)}
+              rows={2}
+            />
+          </div>
+
+          <div className="timer-modal-row">
+            <div className="timer-setup-field" style={{ flex: 1 }}>
+              <label className="form-label">Problems completed</label>
+              <input
+                type="number"
+                className="form-input"
+                min="0"
+                value={problemsCompleted}
+                onChange={e => setProblemsCompleted(Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          <div className="timer-setup-field">
+            <label className="form-label">Notes</label>
+            <textarea
+              className="form-input timer-textarea"
+              placeholder="Any additional notes…"
+              value={sessionNotes}
+              onChange={e => setSessionNotes(e.target.value)}
+              rows={2}
+            />
+          </div>
+        </div>
+
+        <div className="timer-modal-actions">
+          <button
+            className="timer-btn timer-btn-start"
+            onClick={handleSaveSession}
+            disabled={saving}
+            style={{ flex: 1 }}
+          >
+            {saving ? 'Saving…' : 'Save Session'}
+          </button>
+          <button
+            className="timer-btn timer-btn-reset"
+            onClick={handleDiscard}
+            style={{ flex: 0 }}
+          >
+            Discard
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── Focus stage ──────────────────────
+  // While a session runs — and while the write-up modal is open — this is the
+  // only thing on screen: no sidebar, stats, setup form or history competing
+  // for attention.
+  if (isActive || summaryOpen) {
+    return (
+      <div className="focus-stage-inner">
+        <div className={`focus-stage-status ${isPaused ? 'paused' : ''}`}>
+          <span className="focus-stage-dot" />
+          {isBreak ? 'BREAK' : isPaused ? 'PAUSED' : 'IN FOCUS SESSION'}
+        </div>
+
+        <div className="focus-stage-time">{formatTime(displaySeconds)}</div>
+
+        {sessionConfig?.subject && (
+          <div className="focus-stage-task">
+            <span
+              className="timer-subject-dot"
+              style={{ backgroundColor: subjectColors[sessionConfig.subject] || '#6C63FF' }}
+            />
+            {sessionConfig.subject}
+            {sessionConfig.moduleName && ` · ${sessionConfig.moduleName}`}
+          </div>
+        )}
+        {sessionConfig?.task && (
+          <div className="focus-stage-note">{sessionConfig.task}</div>
+        )}
+        {mode === TIMER_MODES.POMODORO && (
+          <div className="focus-stage-note">
+            Block {pomodoroConfig.completedBlocks + 1} · {pomodoroConfig.focusMinutes}m focus / {pomodoroConfig.breakMinutes}m break
+          </div>
+        )}
+
+        <div className="focus-stage-controls">
+          {isRunning ? (
+            <button className="focus-stage-btn" onClick={pauseTimer}>
+              <Pause size={18} />
+              Pause
+            </button>
+          ) : (
+            <button className="focus-stage-btn" onClick={resumeTimer}>
+              <Play size={18} />
+              Resume
+            </button>
+          )}
+          <button className="focus-stage-btn is-primary" onClick={handleStop}>
+            <Square size={18} />
+            Complete &amp; Save
+          </button>
+          <button className="focus-stage-btn is-quiet" onClick={resetTimer}>
+            <RotateCcw size={16} />
+            Discard
+          </button>
+        </div>
+
+        {completionModal}
+      </div>
+    );
+  }
+
   // ─── Render ──────────────────────────
   return (
     <div className="timer-page">
@@ -286,11 +509,12 @@ export default function TimerPage() {
         <div className="page-header-eyebrow">DASHBOARD → FOCUS → STUDY TIMER</div>
         <h1 className="page-header-title" style={{ color: 'var(--color-primary)' }}>Study Timer</h1>
         <p className="page-header-subtitle">
-          {isActive
-            ? "Stay focused. You're doing great."
-            : "Choose what you're working on and start focusing."
-          }
+          Choose what you're working on and start focusing.
         </p>
+        <button className="btn btn-secondary btn-sm timer-log-btn" onClick={() => setShowManual(true)}>
+          <Plus size={14} />
+          Log a session I already studied
+        </button>
       </div>
 
       {/* Stats overview cards */}
@@ -883,93 +1107,153 @@ export default function TimerPage() {
         </div>
       </div>
 
-      {/* Completion Modal */}
-      {showCompletion && completionData && (
-        <div className="timer-modal-overlay" onClick={handleDiscard}>
+      {/* Manual / retrospective entry modal */}
+      {showManual && (
+        <div className="timer-modal-overlay" onClick={() => setShowManual(false)}>
           <div className="timer-modal" onClick={e => e.stopPropagation()}>
-            <button className="timer-modal-close" onClick={handleDiscard}>
+            <button className="timer-modal-close" onClick={() => setShowManual(false)}>
               <X size={18} />
             </button>
 
             <div className="timer-modal-header">
-              <div className="timer-modal-check">
-                <CheckCircle2 size={40} />
-              </div>
-              <h2 className="timer-modal-title">Session Complete</h2>
-              <div className="timer-modal-duration">{formatDuration(completionData.duration)}</div>
+              <h2 className="timer-modal-title">Log finished study</h2>
               <div className="timer-modal-subject">
-                {completionData.moduleName || completionData.topicName || completionData.subject}
+                For sessions you completed without the timer running
               </div>
             </div>
 
             <div className="timer-modal-body">
               <div className="timer-setup-field">
-                <label className="form-label">What did you accomplish?</label>
-                <textarea
-                  className="form-input timer-textarea"
-                  placeholder="Write a quick summary of what you worked on…"
-                  value={accomplishments}
-                  onChange={e => setAccomplishments(e.target.value)}
-                  rows={3}
-                />
-              </div>
-
-              <div className="timer-setup-field">
-                <label className="form-label">What did you learn?</label>
-                <textarea
-                  className="form-input timer-textarea"
-                  placeholder="Key concepts or insights…"
-                  value={learned}
-                  onChange={e => setLearned(e.target.value)}
-                  rows={2}
-                />
+                <label className="form-label">How long did you study?</label>
+                <div className="custom-time-inputs">
+                  <div className="custom-time-field">
+                    <label>Hours</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      min="0"
+                      max="23"
+                      value={manual.hours}
+                      onChange={e => setManualField('hours', Math.max(0, Number(e.target.value) || 0))}
+                    />
+                  </div>
+                  <span className="custom-time-sep">:</span>
+                  <div className="custom-time-field">
+                    <label>Minutes</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      min="0"
+                      max="59"
+                      value={manual.minutes}
+                      onChange={e => setManualField('minutes', Math.min(59, Math.max(0, Number(e.target.value) || 0)))}
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="timer-modal-row">
                 <div className="timer-setup-field" style={{ flex: 1 }}>
-                  <label className="form-label">Problems completed</label>
+                  <label className="form-label">Date</label>
                   <input
-                    type="number"
+                    type="date"
                     className="form-input"
-                    min="0"
-                    value={problemsCompleted}
-                    onChange={e => setProblemsCompleted(Number(e.target.value))}
+                    max={new Date().toISOString().slice(0, 10)}
+                    value={manual.date}
+                    onChange={e => setManualField('date', e.target.value)}
                   />
                 </div>
+                <div className="timer-setup-field" style={{ flex: 1 }}>
+                  <label className="form-label">Started at</label>
+                  <input
+                    type="time"
+                    className="form-input"
+                    value={manual.startTime}
+                    onChange={e => setManualField('startTime', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="timer-setup-field">
+                <label className="form-label">Subject</label>
+                <select
+                  className="form-input"
+                  value={manual.subject}
+                  onChange={e => setManualField('subject', e.target.value)}
+                >
+                  {allSubjects.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {learningPaths.length > 0 && (
+                <div className="timer-setup-field">
+                  <label className="form-label">Learning Path</label>
+                  <select
+                    className="form-input"
+                    value={manual.learningPathId}
+                    onChange={e => setManualField('learningPathId', e.target.value)}
+                  >
+                    <option value="">None</option>
+                    {learningPaths.map(p => (
+                      <option key={p._id} value={p._id}>{p.title}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="timer-setup-field">
+                <label className="form-label">What did you work on?</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder='e.g., "College lecture on operating systems"'
+                  value={manual.task}
+                  onChange={e => setManualField('task', e.target.value)}
+                />
               </div>
 
               <div className="timer-setup-field">
                 <label className="form-label">Notes</label>
                 <textarea
                   className="form-input timer-textarea"
-                  placeholder="Any additional notes…"
-                  value={sessionNotes}
-                  onChange={e => setSessionNotes(e.target.value)}
+                  placeholder="Anything worth remembering…"
+                  value={manual.notes}
+                  onChange={e => setManualField('notes', e.target.value)}
                   rows={2}
                 />
               </div>
+
+              {manualError && (
+                <div style={{ color: 'var(--color-danger)', fontSize: 'var(--font-xs)' }}>
+                  {manualError}
+                </div>
+              )}
             </div>
 
             <div className="timer-modal-actions">
               <button
                 className="timer-btn timer-btn-start"
-                onClick={handleSaveSession}
-                disabled={saving}
+                onClick={handleSaveManual}
+                disabled={manualSaving}
                 style={{ flex: 1 }}
               >
-                {saving ? 'Saving…' : 'Save Session'}
+                {manualSaving ? 'Saving…' : `Save ${formatDuration(manualDurationSeconds)}`}
               </button>
               <button
                 className="timer-btn timer-btn-reset"
-                onClick={handleDiscard}
+                onClick={() => setShowManual(false)}
                 style={{ flex: 0 }}
               >
-                Discard
+                Cancel
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {completionModal}
 
       {/* Session detail modal */}
       {/* (inline expansion is used instead) */}

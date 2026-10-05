@@ -46,6 +46,27 @@ const STATUS_COLOR = {
   pending: null
 };
 
+// Opacity of the calendar blocks. Dark enough to read as solid slabs and to
+// sit clearly over the hour/grid lines, light enough that the lines behind
+// still show through.
+const BLOCK_ALPHA = 0.3;
+
+// Convert a #rgb / #rrggbb colour into rgba() at the given alpha. A hex
+// alpha suffix (e.g. `${color}20`) only works on literal hex — it breaks on
+// var() and named colours — so every block tint goes through here.
+const withAlpha = (color, alpha) => {
+  if (typeof color !== 'string' || !color.startsWith('#')) return color;
+
+  const raw = color.slice(1);
+  const full = raw.length === 3 ? raw.split('').map(c => c + c).join('') : raw;
+  if (full.length !== 6) return color;
+
+  const num = parseInt(full, 16);
+  if (Number.isNaN(num)) return color;
+
+  return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+};
+
 export default function CalendarPage() {
   const [view, setView] = useState('week'); // month, week, day
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -225,16 +246,16 @@ export default function CalendarPage() {
   const dayKey = toDateKey(currentDate);
   const dayTodos = todos.filter(t => t.dueDate && toDateKey(t.dueDate) === dayKey);
   
-  // A helper function to assign random pleasant colors based on subject
+  // A helper function to assign pleasant colors based on subject
   const getSubjectColor = (desc) => {
-    if (!desc) return 'var(--color-primary)';
+    if (!desc) return '#6c63ff';
     const d = desc.toLowerCase();
     if (d.includes('dsa') || d.includes('dynamic')) return '#6366f1'; // indigo
     if (d.includes('machine') || d.includes('ml')) return '#0ea5e9'; // sky
     if (d.includes('system') || d.includes('design')) return '#f59e0b'; // amber
     if (d.includes('web') || d.includes('dev')) return '#10b981'; // emerald
     if (d.includes('competitive') || d.includes('cp')) return '#8b5cf6'; // violet
-    return 'var(--color-primary)';
+    return '#6c63ff';
   };
 
   return (
@@ -353,7 +374,7 @@ export default function CalendarPage() {
                               height: `${height}px`,
                               left: '4px',
                               right: '4px',
-                              backgroundColor: `${bgColor}20`,
+                              backgroundColor: withAlpha(bgColor, BLOCK_ALPHA),
                               borderLeft: `4px solid ${bgColor}`,
                               borderRadius: '4px',
                               padding: '4px 8px',
@@ -450,7 +471,7 @@ export default function CalendarPage() {
                           height: `${height}px`,
                           left: '8px',
                           right: '8px',
-                          backgroundColor: `${bgColor}20`,
+                          backgroundColor: withAlpha(bgColor, BLOCK_ALPHA),
                           borderLeft: `4px solid ${bgColor}`,
                           borderRadius: '4px',
                           padding: '6px 10px',
@@ -585,7 +606,7 @@ export default function CalendarPage() {
                             style={{
                               flexShrink: 0,
                               fontSize: '11px',
-                              backgroundColor: `${bgColor}20`,
+                              backgroundColor: withAlpha(bgColor, BLOCK_ALPHA),
                               borderLeft: `3px solid ${bgColor}`,
                               borderRadius: '3px',
                               padding: '2px 5px',

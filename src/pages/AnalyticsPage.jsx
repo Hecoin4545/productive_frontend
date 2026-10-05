@@ -1,73 +1,50 @@
-import { useState, useEffect } from 'react';
-import {
-  Clock, CheckCircle, Zap, Download, ChevronDown,
-  PieChart, Activity, Filter, ArrowUpRight, ArrowDownRight,
-  Layers, Brain
-} from 'lucide-react';
-import {
-  getAnalyticsOverview, getAnalyticsStudyTime,
-  getAnalyticsSubjects, getAnalyticsLearningPaths, getAnalyticsTopics,
-  getAnalyticsTodos, getAnalyticsHeatmap,
-  getAnalyticsHabits, getAnalyticsRecentActivity,
-  getLearningPaths, exportAnalytics
-} from '../services/api';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Clock, CheckCircle, Download } from 'lucide-react';
+import {
+  getAnalyticsOverview,
+  getAnalyticsStudyTime,
+  getAnalyticsSubjects,
+  getAnalyticsLearningPaths,
+  getAnalyticsTopics,
+  getAnalyticsTodos,
+  getAnalyticsHabits,
+  getAnalyticsRecentActivity,
+  exportAnalytics
+} from '../services/api';
+
+const RANGES = [
+  { value: '7d', label: '7 days' },
+  { value: '30d', label: '30 days' },
+  { value: '90d', label: '90 days' }
+];
+
+const RANGE_LABELS = { '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days' };
+
+const cx = (...parts) => parts.filter(Boolean).join(' ');
 
 export default function AnalyticsPage() {
   const navigate = useNavigate();
 
-  // Filters
-  const [dateRange, setDateRange] = useState('30d'); // 7d, 30d, month, year, custom
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
-  const [showCustomPicker, setShowCustomPicker] = useState(false);
-  const [selectedSubject, setSelectedSubject] = useState('all');
-  const [selectedPathId, setSelectedPathId] = useState('all');
-  const [heatmapMetric, setHeatmapMetric] = useState('studyTime'); // studyTime, tasks
-
-  // State
+  const [period, setPeriod] = useState('30d');
+  const [subject, setSubject] = useState('all');
   const [loading, setLoading] = useState(true);
-  const [learningPathsList, setLearningPathsList] = useState([]);
+  const [exporting, setExporting] = useState(false);
 
   const [overview, setOverview] = useState(null);
-  const [studyTimeData, setStudyTimeData] = useState(null);
-  const [subjectData, setSubjectData] = useState(null);
-  const [pathData, setPathData] = useState([]);
-  const [topicData, setTopicData] = useState([]);
-  const [todoData, setTodoData] = useState(null);
-  const [heatmapData, setHeatmapData] = useState(null);
-  const [habitData, setHabitData] = useState(null);
-  const [recentActivities, setRecentActivities] = useState([]);
+  const [studyTime, setStudyTime] = useState(null);
+  const [subjects, setSubjects] = useState(null);
+  const [paths, setPaths] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [todos, setTodos] = useState(null);
+  const [habits, setHabits] = useState(null);
+  const [activity, setActivity] = useState([]);
 
-  const [exportLoading, setExportLoading] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [hoveredTile, setHoveredTile] = useState(null);
-
-  // Load Learning Paths for Filter Dropdown
   useEffect(() => {
-    getLearningPaths()
-      .then(res => {
-        if (res.data?.success) setLearningPathsList(res.data.data || []);
-      })
-      .catch(err => console.error('Error loading paths for filter:', err));
-  }, []);
-
-  // Fetch all analytics data when filters change
-  useEffect(() => {
-    let isMounted = true;
+    let active = true;
     setLoading(true);
 
-    const params = {
-      period: dateRange,
-      subject: selectedSubject,
-      learningPathId: selectedPathId
-    };
-
-    if (dateRange === 'custom') {
-      if (customFrom) params.from = customFrom;
-      if (customTo) params.to = customTo;
-    }
-
+    const params = { period, subject };
     Promise.all([
       getAnalyticsOverview(params),
       getAnalyticsStudyTime(params),
@@ -75,709 +52,309 @@ export default function AnalyticsPage() {
       getAnalyticsLearningPaths(params),
       getAnalyticsTopics(params),
       getAnalyticsTodos(params),
-      getAnalyticsHeatmap({ ...params, metric: heatmapMetric }),
       getAnalyticsHabits(params),
       getAnalyticsRecentActivity()
     ])
-      .then(([
-        overviewRes, studyTimeRes, subjectRes, pathRes,
-        topicRes, todoRes, heatmapRes, habitRes, recentRes
-      ]) => {
-        if (!isMounted) return;
-        if (overviewRes.data?.success) setOverview(overviewRes.data.data);
-        if (studyTimeRes.data?.success) setStudyTimeData(studyTimeRes.data.data);
-        if (subjectRes.data?.success) setSubjectData(subjectRes.data.data);
-        if (pathRes.data?.success) setPathData(pathRes.data.data);
-        if (topicRes.data?.success) setTopicData(topicRes.data.data);
-        if (todoRes.data?.success) setTodoData(todoRes.data.data);
-        if (heatmapRes.data?.success) setHeatmapData(heatmapRes.data.data);
-        if (habitRes.data?.success) setHabitData(habitRes.data.data);
-        if (recentRes.data?.success) setRecentActivities(recentRes.data.data);
+      .then(([o, st, sub, lp, tp, td, hb, ac]) => {
+        if (!active) return;
+        if (o.data?.success) setOverview(o.data.data);
+        if (st.data?.success) setStudyTime(st.data.data);
+        if (sub.data?.success) setSubjects(sub.data.data);
+        if (lp.data?.success) setPaths(Array.isArray(lp.data.data) ? lp.data.data : []);
+        if (tp.data?.success) setTopics(Array.isArray(tp.data.data) ? tp.data.data : []);
+        if (td.data?.success) setTodos(td.data.data);
+        if (hb.data?.success) setHabits(hb.data.data);
+        if (ac.data?.success) setActivity(Array.isArray(ac.data.data) ? ac.data.data : []);
       })
       .catch(err => console.error('Analytics load error:', err))
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
+      .finally(() => { if (active) setLoading(false); });
 
-    return () => { isMounted = false; };
-  }, [dateRange, customFrom, customTo, selectedSubject, selectedPathId, heatmapMetric]);
+    return () => { active = false; };
+  }, [period, subject]);
 
-  // Handle CSV/JSON export
-  const handleExport = async (format) => {
-    setShowExportMenu(false);
-    setExportLoading(true);
+  const handleExport = useCallback(async (format) => {
+    setExporting(true);
     try {
-      const res = await exportAnalytics({ period: dateRange, format });
-      if (format === 'csv') {
-        const url = window.URL.createObjectURL(new Blob([res.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `arcstep-analytics-${dateRange}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      } else {
-        const jsonStr = JSON.stringify(res.data, null, 2);
-        const url = window.URL.createObjectURL(new Blob([jsonStr], { type: 'application/json' }));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `arcstep-analytics-${dateRange}.json`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      }
+      const res = await exportAnalytics({ period, format });
+      const body = format === 'csv'
+        ? res.data
+        : JSON.stringify(res.data, null, 2);
+      const type = format === 'csv' ? 'text/csv' : 'application/json';
+      const url = URL.createObjectURL(new Blob([body], { type }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `arcstep-analytics-${period}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Export failed:', err);
     } finally {
-      setExportLoading(false);
+      setExporting(false);
     }
-  };
+  }, [period]);
 
-  // Format Helper
-  const rangeLabel = dateRange === 'custom'
-    ? (customFrom && customTo ? `${customFrom} to ${customTo}` : 'Custom range')
-    : ({ '7d': 'Last 7 days', '30d': 'Last 30 days', month: 'This month', year: 'This year' }[dateRange] || 'Last 30 days');
+  const chartData = studyTime?.chartData || [];
+  const maxSeconds = Math.max(...chartData.map(d => d.seconds || 0), 1);
+  const maxSubjectSeconds = Math.max(...(subjects?.subjects || []).map(s => s.seconds || 0), 1);
+  const maxTopicSeconds = Math.max(...topics.map(t => t.seconds || 0), 1);
+  const activeSubject = subject !== 'all' ? subject : null;
+
+  const stat = (label, value, sub) => (
+    <div className="mx-stat">
+      <div className="mx-stat-label">{label}</div>
+      <div className="mx-stat-value">{loading ? '—' : value}</div>
+      <div className="mx-stat-sub">{sub}</div>
+    </div>
+  );
 
   return (
-    <div className="analytics-page">
-      {/* ─── Header Section ──────────────────────────────── */}
-      <div className="analytics-header">
-        <div className="analytics-header-content">
-          <div className="page-header-eyebrow">WORKSPACE → PRODUCTIVITY ANALYTICS</div>
-          <h1 className="page-header-title">Your Progress</h1>
-          <p className="page-header-subtitle">
-            {rangeLabel} · {selectedSubject === 'all' ? 'all subjects' : selectedSubject}
+    <div className="mx-page">
+      <header className="mx-head">
+        <div>
+          <h1 className="mx-title">Analytics</h1>
+          <p className="mx-sub">
+            {RANGE_LABELS[period]}
+            {activeSubject && ` · ${activeSubject}`}
           </p>
         </div>
 
-        {/* Global Controls & Filters */}
-        <div className="analytics-controls">
-          <div className="range-pills">
-            <button
-              className={`range-pill ${dateRange === '7d' ? 'active' : ''}`}
-              onClick={() => setDateRange('7d')}
-            >
-              7 Days
-            </button>
-            <button
-              className={`range-pill ${dateRange === '30d' ? 'active' : ''}`}
-              onClick={() => setDateRange('30d')}
-            >
-              30 Days
-            </button>
-            <button
-              className={`range-pill ${dateRange === 'month' ? 'active' : ''}`}
-              onClick={() => setDateRange('month')}
-            >
-              This Month
-            </button>
-            <button
-              className={`range-pill ${dateRange === 'year' ? 'active' : ''}`}
-              onClick={() => setDateRange('year')}
-            >
-              This Year
-            </button>
-            <button
-              className={`range-pill ${dateRange === 'custom' ? 'active' : ''}`}
-              onClick={() => setShowCustomPicker(!showCustomPicker)}
-            >
-              Custom
-            </button>
-          </div>
-
-          {/* Export Dropdown */}
-          <div className="export-dropdown-wrapper" style={{ position: 'relative' }}>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              disabled={exportLoading}
-            >
-              <Download size={14} />
-              {exportLoading ? 'Exporting...' : 'Export'}
-              <ChevronDown size={14} />
-            </button>
-
-            {showExportMenu && (
-              <div className="export-menu">
-                <button onClick={() => handleExport('csv')}>Download CSV</button>
-                <button onClick={() => handleExport('json')}>Download JSON</button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Custom Date Range Picker Dropdown */}
-      {showCustomPicker && (
-        <div className="custom-range-card">
-          <div className="custom-range-row">
-            <div className="form-group">
-              <label>From Date</label>
-              <input
-                type="date"
-                value={customFrom}
-                onChange={e => setCustomFrom(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <label>To Date</label>
-              <input
-                type="date"
-                value={customTo}
-                onChange={e => setCustomTo(e.target.value)}
-              />
-            </div>
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={() => {
-                setDateRange('custom');
-                setShowCustomPicker(false);
-              }}
-            >
-              Apply Range
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Subject & Path Filter Row */}
-      <div className="analytics-filter-bar">
-        <div className="filter-item">
-          <Filter size={14} style={{ color: 'var(--color-text-tertiary)' }} />
-          <span>Subject:</span>
-          <select
-            value={selectedSubject}
-            onChange={e => setSelectedSubject(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">All Subjects</option>
-            {subjectData?.subjects?.map(s => (
-              <option key={s.subject} value={s.subject}>{s.subject}</option>
+        <div className="mx-head-actions">
+          <div className="mx-segments">
+            {RANGES.map(r => (
+              <button
+                key={r.value}
+                className={cx('mx-segment', period === r.value && 'is-active')}
+                onClick={() => setPeriod(r.value)}
+              >
+                {r.label}
+              </button>
             ))}
-          </select>
-        </div>
-
-        <div className="filter-item">
-          <Layers size={14} style={{ color: 'var(--color-text-tertiary)' }} />
-          <span>Learning Path:</span>
-          <select
-            value={selectedPathId}
-            onChange={e => setSelectedPathId(e.target.value)}
-            className="filter-select"
-          >
-            <option value="all">All Learning Paths</option>
-            {learningPathsList.map(lp => (
-              <option key={lp._id} value={lp._id}>{lp.title}</option>
-            ))}
-          </select>
-        </div>
-
-        {(selectedSubject !== 'all' || selectedPathId !== 'all') && (
+          </div>
           <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => { setSelectedSubject('all'); setSelectedPathId('all'); }}
+            className="btn btn-secondary btn-sm"
+            onClick={() => handleExport('csv')}
+            disabled={exporting}
           >
-            Reset Filters
+            <Download size={14} />
+            {exporting ? 'Exporting' : 'Export'}
           </button>
-        )}
-      </div>
+        </div>
+      </header>
 
-      {/* ─── 3. Top Summary Cards ─────────────────────────── */}
-      <div className="analytics-summary-grid">
-        {/* Card 1: Total Study Time */}
-        <div className="summary-card">
-          <div className="summary-card-header">
-            <span className="summary-card-title">TOTAL STUDY TIME</span>
-            <div className="summary-card-icon" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-              <Clock size={16} />
+      <section className="mx-stats">
+        {stat('Study time', overview?.totalStudyFormatted || '0m',
+          overview?.diffFormatted ? `${overview.diffFormatted} vs previous` : RANGE_LABELS[period])}
+        {stat('Sessions', overview?.totalSessions ?? 0, 'Completed sessions')}
+        {stat('Tasks done', overview?.tasksCompleted ?? 0, 'Marked complete')}
+        {stat('Streak', `${overview?.currentStreak ?? 0}d`, `Best ${overview?.longestStreak ?? 0}d`)}
+      </section>
+
+      <section className="mx-card">
+        <div className="mx-card-head">
+          <h2 className="mx-card-title">Daily study</h2>
+          <span className="mx-card-note">{studyTime?.totalFormatted || '0m'} total</span>
+        </div>
+
+        {loading ? (
+          <div className="skeleton-box" style={{ height: 180 }} />
+        ) : chartData.length === 0 ? (
+          <div className="mx-empty">
+            <p>No study sessions in this period.</p>
+            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/timer')}>
+              Start a session
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mx-chart">
+              {chartData.map(d => (
+                <div key={d.dateKey} className="mx-chart-col" title={`${d.fullDate} · ${d.formatted}`}>
+                  <div className="mx-chart-track">
+                    <div
+                      className={cx('mx-chart-bar', d.seconds === 0 && 'is-empty')}
+                      style={{ height: `${Math.max(d.seconds > 0 ? 2 : 0, (d.seconds / maxSeconds) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="mx-chart-label">{d.label}</span>
+                </div>
+              ))}
             </div>
-          </div>
-          <div className="summary-card-value">
-            {loading ? <span className="skeleton-pulse">...</span> : (overview?.totalStudyFormatted || '0m')}
-          </div>
-          <div className="summary-card-footer">
-            {overview?.diffFormatted ? (
-              <span className={`diff-badge ${overview.diffSeconds >= 0 ? 'positive' : 'negative'}`}>
-                {overview.diffSeconds >= 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                {overview.diffFormatted} vs prev period
-              </span>
-            ) : (
-              <span className="summary-card-subtext">For selected range</span>
+            <div className="mx-card-foot">
+              <span>Average {studyTime?.averagePerDayFormatted || '0m'} / day</span>
+              <span>Longest day {studyTime?.longestStudyDay || '—'}</span>
+              <span>Longest session {studyTime?.longestSessionFormatted || '0m'}</span>
+            </div>
+          </>
+        )}
+      </section>
+
+      <div className="mx-two-col">
+        <section className="mx-card">
+          <div className="mx-card-head">
+            <h2 className="mx-card-title">By subject</h2>
+            {activeSubject && (
+              <button className="mx-link" onClick={() => setSubject('all')}>Clear</button>
             )}
           </div>
-        </div>
 
-        {/* Card 2: Study Sessions */}
-        <div className="summary-card">
-          <div className="summary-card-header">
-            <span className="summary-card-title">STUDY SESSIONS</span>
-            <div className="summary-card-icon" style={{ background: 'rgba(34, 197, 94, 0.1)', color: 'var(--color-success)' }}>
-              <Activity size={16} />
-            </div>
-          </div>
-          <div className="summary-card-value">
-            {loading ? <span className="skeleton-pulse">...</span> : (overview?.totalSessions || 0)}
-          </div>
-          <div className="summary-card-footer">
-            <span className="summary-card-subtext">Completed sessions</span>
-          </div>
-        </div>
-
-        {/* Card 3: Tasks Completed */}
-        <div className="summary-card">
-          <div className="summary-card-header">
-            <span className="summary-card-title">TASKS COMPLETED</span>
-            <div className="summary-card-icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: 'var(--color-warning)' }}>
-              <CheckCircle size={16} />
-            </div>
-          </div>
-          <div className="summary-card-value">
-            {loading ? <span className="skeleton-pulse">...</span> : (overview?.tasksCompleted || 0)}
-          </div>
-          <div className="summary-card-footer">
-            <span className="summary-card-subtext">Finished TODO items</span>
-          </div>
-        </div>
-
-        {/* Card 4: Current Streak */}
-        <div className="summary-card">
-          <div className="summary-card-header">
-            <span className="summary-card-title">CURRENT STREAK</span>
-            <div className="summary-card-icon" style={{ background: 'rgba(139, 92, 246, 0.1)', color: '#8B5CF6' }}>
-              <Zap size={16} />
-            </div>
-          </div>
-          <div className="summary-card-value">
-            {loading ? <span className="skeleton-pulse">...</span> : `${overview?.currentStreak || 0} days`}
-          </div>
-          <div className="summary-card-footer">
-            <span className="summary-card-subtext">Best: {overview?.longestStreak || 0} days</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ─── Consistency Heatmap ──────────────────────────── */}
-      <div className="analytics-card heatmap-card">
-        <div className="card-header-row">
-          <div>
-            <h3 className="card-title">Consistency</h3>
-            <p className="card-subtitle">Every day in the selected range</p>
-          </div>
-
-          <div className="heatmap-metric-selector">
-            <button
-              className={`metric-btn ${heatmapMetric === 'studyTime' ? 'active' : ''}`}
-              onClick={() => setHeatmapMetric('studyTime')}
-            >
-              Study Time
-            </button>
-            <button
-              className={`metric-btn ${heatmapMetric === 'tasks' ? 'active' : ''}`}
-              onClick={() => setHeatmapMetric('tasks')}
-            >
-              Tasks
-            </button>
-          </div>
-        </div>
-
-        <div className="heatmap-grid-container">
           {loading ? (
-            <div className="skeleton-box" style={{ height: '140px', width: '100%' }} />
+            <div className="skeleton-box" style={{ height: 140 }} />
+          ) : !subjects?.subjects?.length ? (
+            <div className="mx-empty"><p>Nothing logged yet.</p></div>
           ) : (
-            <div className="heatmap-grid">
-              {heatmapData?.matrix?.map((tile, idx) => (
-                <div
-                  key={tile.dateKey || idx}
-                  className={`heatmap-cell level-${tile.level}`}
-                  onMouseEnter={() => setHoveredTile(tile)}
-                  onMouseLeave={() => setHoveredTile(null)}
+            <div className="mx-rows">
+              {subjects.subjects.map(s => (
+                <button
+                  key={s.subject}
+                  className={cx('mx-row', activeSubject === s.subject && 'is-active')}
+                  onClick={() => setSubject(activeSubject === s.subject ? 'all' : s.subject)}
                 >
-                  {hoveredTile?.dateKey === tile.dateKey && (
-                    <div className="heatmap-tooltip">
-                      <div className="tooltip-date">{tile.formattedDate}</div>
-                      <div className="tooltip-val">{tile.formattedValue}</div>
-                      <div className="tooltip-sub">
-                        {heatmapMetric === 'tasks' ? 'Tasks' : 'Study Time'}: {tile.value}
-                      </div>
-                    </div>
-                  )}
+                  <span className="mx-row-top">
+                    <span className="mx-row-name">
+                      <i className="mx-dot" style={{ background: s.color }} />
+                      {s.subject}
+                    </span>
+                    <span className="mx-row-val">{s.formattedTime}</span>
+                  </span>
+                  <span className="mx-track">
+                    <span className="mx-track-fill" style={{ width: `${(s.seconds / maxSubjectSeconds) * 100}%`, background: s.color }} />
+                  </span>
+                  <span className="mx-row-sub">{s.sessionsCount} sessions · {s.percentage}%</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mx-card">
+          <div className="mx-card-head">
+            <h2 className="mx-card-title">Top topics</h2>
+          </div>
+
+          {loading ? (
+            <div className="skeleton-box" style={{ height: 140 }} />
+          ) : topics.length === 0 ? (
+            <div className="mx-empty"><p>No topic data in this period.</p></div>
+          ) : (
+            <div className="mx-rows">
+              {topics.slice(0, 8).map(t => (
+                <div key={t.topic} className="mx-row is-static">
+                  <span className="mx-row-top">
+                    <span className="mx-row-name">{t.topic}</span>
+                    <span className="mx-row-val">{t.formattedTime}</span>
+                  </span>
+                  <span className="mx-track">
+                    <span className="mx-track-fill" style={{ width: `${(t.seconds / maxTopicSeconds) * 100}%` }} />
+                  </span>
+                  <span className="mx-row-sub">{t.sessionsCount} sessions</span>
                 </div>
               ))}
             </div>
           )}
-        </div>
-
-        <div className="heatmap-footer-row">
-          <div className="heatmap-stat">
-            <span className="stat-value">
-              {heatmapData?.activeDays || 0} / {heatmapData?.totalDays || 0} Days ({heatmapData?.activeRatio || 0}%)
-            </span>
-            <span className="stat-label">ACTIVE DAYS</span>
-          </div>
-
-          <div className="heatmap-legend">
-            <span>Less</span>
-            <div className="legend-cell level-0"></div>
-            <div className="legend-cell level-1"></div>
-            <div className="legend-cell level-2"></div>
-            <div className="legend-cell level-3"></div>
-            <div className="legend-cell level-4"></div>
-            <span>More</span>
-          </div>
-        </div>
+        </section>
       </div>
 
-      {/* ─── 4. & 6. Study Time Overview & Time by Subject ──── */}
-      <div className="analytics-two-col">
-        {/* Left: Study Time Bar Chart */}
-        <div className="analytics-card">
-          <div className="card-header-row">
-            <div>
-              <h3 className="card-title">Study Time Overview</h3>
-              <p className="card-subtitle">Daily breakdown for selected date range</p>
-            </div>
-            <div className="card-badge">{studyTimeData?.totalFormatted || '0h'}</div>
+      {paths.length > 0 && (
+        <section className="mx-card">
+          <div className="mx-card-head">
+            <h2 className="mx-card-title">Learning paths</h2>
           </div>
-
-          {loading ? (
-            <div className="skeleton-box" style={{ height: '220px' }} />
-          ) : (
-            <div className="bar-chart-container">
-              {studyTimeData?.chartData?.length > 0 ? (
-                <div className="bar-chart">
-                  {studyTimeData.chartData.map((d, i) => {
-                    const maxHours = Math.max(...studyTimeData.chartData.map(c => c.hours), 4);
-                    const heightPct = Math.max(8, Math.min(100, (d.hours / maxHours) * 100));
-                    return (
-                      <div key={i} className="bar-column">
-                        <div className="bar-fill-wrapper">
-                          <div
-                            className="bar-fill"
-                            style={{ height: `${heightPct}%` }}
-                            title={`${d.fullDate}: ${d.formatted}`}
-                          >
-                            <span className="bar-tooltip-hover">{d.formatted}</span>
-                          </div>
-                        </div>
-                        <span className="bar-label">{d.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="empty-chart-box">
-                  <Clock size={28} />
-                  <p>No study sessions recorded for this period.</p>
-                  <button className="btn btn-secondary btn-sm" onClick={() => navigate('/timer')}>Start Timer</button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Sub-stats below chart */}
-          <div className="chart-substats-row">
-            <div className="substat-item">
-              <span className="substat-label">Average per day</span>
-              <span className="substat-val">{studyTimeData?.averagePerDayFormatted || '0m'}</span>
-            </div>
-            <div className="substat-item">
-              <span className="substat-label">Longest study day</span>
-              <span className="substat-val">{studyTimeData?.longestStudyDay || 'None'}</span>
-            </div>
-            <div className="substat-item">
-              <span className="substat-label">Longest session</span>
-              <span className="substat-val">{studyTimeData?.longestSessionFormatted || '0m'}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Time by Subject Donut Chart */}
-        <div className="analytics-card">
-          <div className="card-header-row">
-            <div>
-              <h3 className="card-title">Where your time goes</h3>
-              <p className="card-subtitle">Subject distribution breakdown</p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="skeleton-box" style={{ height: '220px' }} />
-          ) : (
-            <div className="donut-section">
-              {subjectData?.subjects?.length > 0 ? (
-                <div className="donut-layout">
-                  <div className="donut-graphic">
-                    <svg viewBox="0 0 100 100" className="donut-svg">
-                      <circle cx="50" cy="50" r="38" fill="transparent" stroke="var(--color-surface-hover)" strokeWidth="12" />
-                      {(() => {
-                        let accumulatedPct = 0;
-                        return subjectData.subjects.map((s, idx) => {
-                          const strokeDasharray = `${s.percentage * 2.388} 238.8`;
-                          const strokeDashoffset = -accumulatedPct * 2.388;
-                          accumulatedPct += s.percentage;
-                          return (
-                            <circle
-                              key={idx}
-                              cx="50"
-                              cy="50"
-                              r="38"
-                              fill="transparent"
-                              stroke={s.color}
-                              strokeWidth="12"
-                              strokeDasharray={strokeDasharray}
-                              strokeDashoffset={strokeDashoffset}
-                              transform="rotate(-90 50 50)"
-                            />
-                          );
-                        });
-                      })()}
-                    </svg>
-                    <div className="donut-center-text">
-                      <span className="donut-center-val">{subjectData.totalFormatted}</span>
-                      <span className="donut-center-lbl">TOTAL TIME</span>
-                    </div>
-                  </div>
-
-                  <div className="subject-legend-list">
-                    {subjectData.subjects.map((s, idx) => (
-                      <div
-                        key={idx}
-                        className={`subject-legend-item ${selectedSubject === s.subject ? 'selected' : ''}`}
-                        onClick={() => setSelectedSubject(selectedSubject === s.subject ? 'all' : s.subject)}
-                      >
-                        <div className="legend-dot" style={{ backgroundColor: s.color }} />
-                        <div className="legend-info">
-                          <span className="legend-name">{s.subject}</span>
-                          <span className="legend-detail">{s.formattedTime} ({s.sessionsCount} sessions)</span>
-                        </div>
-                        <span className="legend-pct">{s.percentage}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="empty-chart-box">
-                  <PieChart size={28} />
-                  <p>No subject distribution available yet.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-
-      {/* ─── 7. & 9. Learning Path Activity & Progress ───── */}
-      <div className="analytics-card">
-        <div className="card-header-row">
-          <div>
-            <h3 className="card-title">Learning Path Progression & Activity</h3>
-            <p className="card-subtitle">Curriculum module advancement and time allocation</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="skeleton-box" style={{ height: '200px' }} />
-        ) : (
-          <div className="learning-path-analytics-list">
-            {pathData.length > 0 ? (
-              pathData.map((lp) => (
-                <div key={lp._id} className="lp-analytics-row">
-                  <div className="lp-info">
-                    <div className="lp-title-row">
-                      <div className="lp-color-badge" style={{ backgroundColor: lp.color }} />
-                      <span className="lp-title">{lp.title}</span>
-                      <span className="lp-time-badge">{lp.formattedTime} logged</span>
-                    </div>
-                    <div className="lp-sub-details">
-                      <span>
-                        {lp.sessionsCount || 0} sessions · {lp.topicsStudiedCount || 0} topics
-                        {lp.topicsStudied?.length ? ` (${lp.topicsStudied.slice(0, 3).join(', ')}${lp.topicsStudied.length > 3 ? '…' : ''})` : ''}
-                      </span>
-                      <span>{lp.tasksCompleted || 0}/{lp.totalTasks || 0} tasks done</span>
-                    </div>
-                  </div>
-
-                  <div className="lp-progress-section">
-                    <div className="lp-progress-meta">
-                      <span>Progress</span>
-                      <span className="lp-pct-value">{lp.progress}%</span>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${lp.progress}%`, backgroundColor: lp.color }} />
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-chart-box">
-                <Layers size={28} />
-                <p>No learning path activity found.</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ─── 8. & 12. Most Studied Topics & Task Velocity ───── */}
-      <div className="analytics-two-col">
-        {/* Left: Most Studied Topics */}
-        <div className="analytics-card">
-          <div className="card-header-row">
-            <div>
-              <h3 className="card-title">Most Studied Topics</h3>
-              <p className="card-subtitle">Topics ranked by actual logged study duration</p>
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="skeleton-box" style={{ height: '200px' }} />
-          ) : (
-            <div className="topics-ranking-list">
-              {topicData.length > 0 ? (
-                topicData.map((t, idx) => (
-                  <div key={idx} className="topic-rank-item">
-                    <div className="topic-rank-number">#{idx + 1}</div>
-                    <div className="topic-rank-info">
-                      <div className="topic-rank-header">
-                        <span className="topic-name">{t.topic}</span>
-                        <span className="topic-time">{t.formattedTime}</span>
-                      </div>
-                      <div className="progress-bar mini">
-                        <div className="progress-fill" style={{ width: `${Math.max(10, t.percentage)}%` }} />
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="empty-chart-box">
-                  <Brain size={28} />
-                  <p>No topic session data available.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Right: Task breakdown */}
-        <div className="analytics-card">
-          <div className="card-header-row">
-            <div>
-              <h3 className="card-title">Tasks</h3>
-              <p className="card-subtitle">All your todo items right now</p>
-            </div>
-            <div className="card-badge">{todoData?.completionRate || 0}% Completed</div>
-          </div>
-
-          {loading ? (
-            <div className="skeleton-box" style={{ height: '200px' }} />
-          ) : (
-            <div className="task-velocity-content">
-              <div className="task-stats-three">
-                <div className="task-stat-box done">
-                  <span className="num">{todoData?.completed || 0}</span>
-                  <span className="lbl">Done</span>
-                </div>
-                <div className="task-stat-box pending">
-                  <span className="num">{todoData?.pending || 0}</span>
-                  <span className="lbl">Pending</span>
-                </div>
-                <div className="task-stat-box overdue">
-                  <span className="num">{todoData?.overdue || 0}</span>
-                  <span className="lbl">Overdue</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ─── Study Habits ──────────────────────────────────── */}
-      <div className="analytics-card">
-        <div className="card-header-row">
-          <div>
-            <h3 className="card-title">Study Habits</h3>
-            <p className="card-subtitle">When your focus sessions actually happen</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="skeleton-box" style={{ height: '180px' }} />
-        ) : (
-          <div className="habits-container">
-            <div className="habits-stats-row">
-              <div className="habit-card">
-                <span className="habit-title">Most Active Day</span>
-                <span className="habit-val">{habitData?.mostActiveDay || 'None'}</span>
-              </div>
-              <div className="habit-card">
-                <span className="habit-title">Most Active Time</span>
-                <span className="habit-val">{habitData?.mostActiveTime || 'None'}</span>
-              </div>
-              <div className="habit-card">
-                <span className="habit-title">Average Session</span>
-                <span className="habit-val">{habitData?.averageSessionFormatted || '0m'}</span>
-              </div>
-              <div className="habit-card">
-                <span className="habit-title">Longest Session</span>
-                <span className="habit-val">{habitData?.longestSessionFormatted || '0m'}</span>
-              </div>
-            </div>
-
-            {/* Time by Hour Distribution */}
-            <div className="hour-distribution-section">
-              <span className="hour-dist-title">Study Activity by Hour of Day (6 AM – 10 PM):</span>
-              <div className="hour-bars-row">
-                {habitData?.hourDistribution?.map((hd, i) => (
-                  <div key={i} className="hour-col">
-                    <div className="hour-bar-fill" style={{ height: `${Math.min(100, Math.max(10, hd.hours * 25))}%` }} title={`${hd.hour}: ${hd.hours}h`} />
-                    <span className="hour-lbl">{hd.hour}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-        {/* ─── Recent Activity ──────────────────────────────── */}
-      <div className="analytics-card">
-        <div className="card-header-row">
-          <div>
-            <h3 className="card-title">Recent Activity</h3>
-            <p className="card-subtitle">Latest completed sessions and tasks</p>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="skeleton-box" style={{ height: '160px' }} />
-        ) : (
-          <div className="recent-activity-list">
-            {recentActivities.length > 0 ? (
-              recentActivities.map((act) => (
-                <div key={act.id} className="activity-item">
-                  <div className="activity-icon">
-                    {act.type === 'session' && <Clock size={14} />}
-                    {act.type === 'todo' && <CheckCircle size={14} />}
-                  </div>
-                  <div className="activity-info">
-                    <span className="activity-title">{act.title}</span>
-                    <span className="activity-sub">{act.subtitle}</span>
-                  </div>
-                  <span className="activity-time">
-                    {new Date(act.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          <div className="mx-rows">
+            {paths.map(lp => (
+              <div key={lp._id} className="mx-row is-static">
+                <span className="mx-row-top">
+                  <span className="mx-row-name">
+                    <i className="mx-dot" style={{ background: lp.color }} />
+                    {lp.title}
                   </span>
-                </div>
-              ))
-            ) : (
-              <div className="empty-chart-box">
-                <Activity size={24} />
-                <p>No recent activity recorded.</p>
+                  <span className="mx-row-val">{lp.progress}%</span>
+                </span>
+                <span className="mx-track">
+                  <span className="mx-track-fill" style={{ width: `${lp.progress}%`, background: lp.color }} />
+                </span>
+                <span className="mx-row-sub">
+                  {lp.formattedTime} logged · {lp.sessionsCount} sessions · {lp.tasksCompleted}/{lp.totalTasks} tasks
+                </span>
               </div>
-            )}
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="mx-two-col">
+        <section className="mx-card">
+          <div className="mx-card-head">
+            <h2 className="mx-card-title">Tasks</h2>
+            <span className="mx-card-note">{todos?.completionRate ?? 0}% done</span>
+          </div>
+          <div className="mx-mini-grid">
+            <div className="mx-mini">
+              <span className="mx-mini-val">{todos?.completed ?? 0}</span>
+              <span className="mx-mini-lbl">Done</span>
+            </div>
+            <div className="mx-mini">
+              <span className="mx-mini-val">{todos?.pending ?? 0}</span>
+              <span className="mx-mini-lbl">Pending</span>
+            </div>
+            <div className="mx-mini">
+              <span className="mx-mini-val">{todos?.overdue ?? 0}</span>
+              <span className="mx-mini-lbl">Overdue</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-card">
+          <div className="mx-card-head">
+            <h2 className="mx-card-title">Habits</h2>
+          </div>
+          <div className="mx-mini-grid">
+            <div className="mx-mini">
+              <span className="mx-mini-val">{habits?.mostActiveDay || '—'}</span>
+              <span className="mx-mini-lbl">Active day</span>
+            </div>
+            <div className="mx-mini">
+              <span className="mx-mini-val">{habits?.mostActiveTime || '—'}</span>
+              <span className="mx-mini-lbl">Peak window</span>
+            </div>
+            <div className="mx-mini">
+              <span className="mx-mini-val">{habits?.averageSessionFormatted || '0m'}</span>
+              <span className="mx-mini-lbl">Avg session</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section className="mx-card">
+        <div className="mx-card-head">
+          <h2 className="mx-card-title">Recent activity</h2>
+        </div>
+        {loading ? (
+          <div className="skeleton-box" style={{ height: 120 }} />
+        ) : activity.length === 0 ? (
+          <div className="mx-empty"><p>No recent activity.</p></div>
+        ) : (
+          <div className="mx-rows">
+            {activity.map(a => (
+              <div key={a.id} className="mx-row is-static">
+                <span className="mx-row-top">
+                  <span className="mx-row-name">
+                    {a.type === 'session'
+                      ? <Clock size={13} className="mx-row-icon" />
+                      : <CheckCircle size={13} className="mx-row-icon" />}
+                    {a.title}
+                  </span>
+                  <span className="mx-row-val">{a.subtitle}</span>
+                </span>
+                <span className="mx-row-sub">
+                  {new Date(a.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              </div>
+            ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

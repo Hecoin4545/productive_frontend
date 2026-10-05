@@ -310,6 +310,10 @@ export function TimerProvider({ children }) {
   const isPaused = timerState === TIMER_STATES.PAUSED;
   const isTimerComplete = (mode !== TIMER_MODES.STOPWATCH) && targetDuration > 0 && elapsed >= targetDuration;
 
+  // True while the post-session write-up is open. Kept here (not in TimerPage)
+  // so the layout can stay in fullscreen focus mode after the timer stops.
+  const [summaryOpen, setSummaryOpen] = useState(false);
+
   const value = {
     // State
     timerState,
@@ -327,6 +331,8 @@ export function TimerProvider({ children }) {
     isRunning,
     isPaused,
     isTimerComplete,
+    summaryOpen,
+    setSummaryOpen,
 
     // Actions
     startTimer,

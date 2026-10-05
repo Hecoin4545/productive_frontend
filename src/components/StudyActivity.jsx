@@ -1,12 +1,3 @@
-const subjectColors = {
-  'Data Structures & Algorithms': '#6C63FF',
-  'Machine Learning': '#22C55E',
-  'Competitive Programming': '#8B5CF6',
-  'Web Development': '#F59E0B',
-  'System Design': '#EF4444',
-  'Mathematics': '#06B6D4',
-};
-
 function formatTime(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -14,7 +5,7 @@ function formatTime(dateStr) {
 }
 
 function formatDuration(minutes) {
-  if (!minutes) return '';
+  if (!minutes) return '0m';
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h === 0) return `${m}m`;
@@ -47,11 +38,11 @@ export default function StudyActivity({ sessions }) {
               </span>
               <div
                 className="study-session-indicator"
-                style={{ backgroundColor: subjectColors[session.subject] || '#6C63FF' }}
+                style={{ backgroundColor: session.learningPathColor || '#6C63FF' }}
               />
               <div className="study-session-info">
-                <div className="study-session-subject">{session.subject}</div>
-                <div className="study-session-topic">{session.topic}</div>
+                <div className="study-session-subject">{session.subject || 'Untitled session'}</div>
+                {session.topic && <div className="study-session-topic">{session.topic}</div>}
               </div>
               <span className="study-session-duration">
                 {formatDuration(session.duration)}
