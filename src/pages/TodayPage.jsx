@@ -51,6 +51,7 @@ export default function TodayPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [todayKey, setTodayKey] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     loadDashboard();
@@ -96,6 +97,14 @@ export default function TodayPage() {
       duration: Number.isFinite(mins) && mins > 0 ? `${mins} min` : ''
     };
   }, [todos]);
+
+  useEffect(() => {
+    const compute = () => setTodayKey(new Date().toISOString().slice(0, 10));
+    compute();
+    const onVisible = () => compute();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
 
   if (loading) {
     return (
@@ -164,23 +173,23 @@ export default function TodayPage() {
       {/* Main Dashboard Grid */}
       <div className="dashboard-grid">
         {/* Left column: Todos */}
-        <TodoOverview todos={d.todos} />
+        <TodoOverview key={todayKey} todos={d.todos} />
         {/* Right column: Focus */}
-        <FocusCard learningPath={currentPath} nextSession={nextSession} />
+        <FocusCard key={todayKey} learningPath={currentPath} nextSession={nextSession} />
       </div>
 
       <div className="dashboard-grid">
         {/* Left column: Study Activity */}
-        <StudyActivity sessions={d.studySessions} />
+        <StudyActivity key={todayKey} sessions={d.studySessions} />
         {/* Right column: Weekly Chart */}
         <StudyChart weeklyData={d.weeklyStudy} />
       </div>
 
       <div className="dashboard-grid">
         {/* Left column: Learning Progress */}
-        <LearningProgress paths={learningPaths} />
+        <LearningProgress key={todayKey} paths={learningPaths} />
         {/* Right column: Goals */}
-        <GoalsOverview goals={d.goals} />
+        <GoalsOverview key={todayKey} goals={d.goals} />
       </div>
     </div>
   );

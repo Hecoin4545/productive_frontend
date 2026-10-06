@@ -4,6 +4,48 @@ const TimerContext = createContext(null);
 
 const STORAGE_KEY = 'arcstep_active_timer';
 
+// Tiny feedback tones via Web Audio API — no files needed.
+// Browsers require a user gesture before AudioContext can play, so the
+// context is created lazily on first click/tap.
+let audioCtx = null;
+const getAudioCtx = () => {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+};
+
+const playTone = (freq, startTime, duration, type = 'sine', volume = 0.15) => {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, startTime);
+    gain.gain.setValueAtTime(volume, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
+  } catch {
+    // Silently ignore audio errors (e.g. no user gesture yet)
+  }
+};
+
+const startSound = () => {
+  const now = getAudioCtx().currentTime;
+  playTone(880, now, 0.08, 'sine', 0.12);
+  playTone(1100, now + 0.07, 0.1, 'sine', 0.1);
+};
+
+const completeSound = () => {
+  const now = getAudioCtx().currentTime;
+  playTone(660, now, 0.12, 'sine', 0.15);
+  playTone(880, now + 0.12, 0.18, 'sine', 0.12);
+  playTone(1100, now + 0.3, 0.22, 'sine', 0.1);
+};
+
 const TIMER_MODES = {
   POMODORO: 'pomodoro',
   CUSTOM: 'custom',
@@ -166,11 +208,14 @@ export function TimerProvider({ children }) {
           if (currentElapsed >= targetDuration) {
             setElapsed(targetDuration);
             // Timer completed
+            if (!completeSoundRef.current) {
+              completeSoundRef.current = true;
+              completeSound();
+            }
             if (mode === TIMER_MODES.POMODORO && !isBreak) {
               // Switch to break
               handlePomodoroBreak();
             }
-            // For custom timer, we don't auto-stop — user should notice
           }
         }
       };
@@ -195,6 +240,7 @@ export function TimerProvider({ children }) {
     setElapsed(0);
     setIsBreak(false);
     setAccumulatedFocusSeconds(0);
+    completeSoundRef.current = false;
 
     if (config.subject !== undefined) {
       setSessionConfig({
@@ -223,6 +269,7 @@ export function TimerProvider({ children }) {
     }
 
     setTimerState(TIMER_STATES.RUNNING);
+    startSound();
   }, []);
 
   const pauseTimer = useCallback(() => {
@@ -255,6 +302,11 @@ export function TimerProvider({ children }) {
     const finalElapsed = calculateElapsed();
     setElapsed(finalElapsed);
     setTimerState(TIMER_STATES.IDLE);
+
+    if (!completeSoundRef.current) {
+      completeSoundRef.current = true;
+      completeSound();
+    }
 
     const safeAccumulated = Number(accumulatedFocusSeconds) || 0;
     const safeElapsed = Number(finalElapsed) || 0;
@@ -313,6 +365,7 @@ export function TimerProvider({ children }) {
   // True while the post-session write-up is open. Kept here (not in TimerPage)
   // so the layout can stay in fullscreen focus mode after the timer stops.
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const completeSoundRef = useRef(false);
 
   const value = {
     // State

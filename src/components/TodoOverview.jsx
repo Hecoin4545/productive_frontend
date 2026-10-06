@@ -64,11 +64,21 @@ export default function TodoOverview({ todos: initialTodos }) {
     }
   };
 
-  // Safely filter todos
-  const pendingTodos = Array.isArray(todos) ? todos.filter(t => !t.completed) : [];
-  const completedTodos = Array.isArray(todos) ? todos.filter(t => t.completed) : [];
+  // Safely filter todos to only include those scheduled for today
+  const today = new Date();
+  const isToday = (dateStr) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return d.getFullYear() === today.getFullYear() &&
+           d.getMonth() === today.getMonth() &&
+           d.getDate() === today.getDate();
+  };
 
-  // Soonest scheduled first, then unscheduled, then anything without a due date
+  const todayTodos = Array.isArray(todos) ? todos.filter(t => isToday(t.dueDate)) : [];
+  const pendingTodos = todayTodos.filter(t => !t.completed);
+  const completedTodos = todayTodos.filter(t => t.completed);
+
+  // Soonest scheduled first
   const bySchedule = (a, b) => {
     const at = a.dueDate ? new Date(a.dueDate).getTime() : null;
     const bt = b.dueDate ? new Date(b.dueDate).getTime() : null;
