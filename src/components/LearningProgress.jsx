@@ -1,34 +1,40 @@
+import { useNavigate } from 'react-router-dom';
+
 export default function LearningProgress({ paths }) {
+  const navigate = useNavigate();
   const data = Array.isArray(paths) ? paths : [];
 
   return (
     <div className="card fade-in">
       <div className="card-header">
-        <h3 className="card-title">Learning Progress</h3>
+        <div className="card-header-eyebrow-group">
+          <span className="card-header-red-dot">■</span>
+          <h3 className="card-title">FIG 2.02 // SUBJECT ALLOCATION & PROGRESS</h3>
+        </div>
+        <span className="card-eyebrow">COGNITIVE TRACK</span>
       </div>
+
       {data.length === 0 ? (
-        <div className="progress-list">
-          <p style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-sm)', padding: 'var(--space-4) 0' }}>
-            No learning paths yet. Create one to start tracking progress.
-          </p>
+        <div className="todo-empty-state">
+          <span className="todo-empty-icon">■</span>
+          <span>No learning paths defined. Create one to begin tracking.</span>
         </div>
       ) : (
         <div className="progress-list">
           {data.map((path, i) => (
-            <div key={path._id || i} className="progress-item">
+            <div
+              key={path._id || i}
+              className="progress-item"
+              onClick={() => path._id && navigate(`/learning/${path._id}`)}
+              style={{ cursor: path._id ? 'pointer' : 'default' }}
+            >
               <div className="progress-item-header">
                 <span className="progress-item-name">
                   <span
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      backgroundColor: path.color || '#6C63FF',
-                      display: 'inline-block',
-                      flexShrink: 0,
-                    }}
+                    className="progress-item-dot"
+                    style={{ backgroundColor: path.color || '#E03E2D' }}
                   />
-                  {path.title}
+                  <span>{path.title}</span>
                 </span>
                 <span className="progress-item-value">{path.progress}%</span>
               </div>
@@ -36,8 +42,8 @@ export default function LearningProgress({ paths }) {
                 <div
                   className="progress-fill"
                   style={{
-                    width: `${path.progress}%`,
-                    backgroundColor: path.color || '#6C63FF',
+                    width: `${Math.min(100, Math.max(5, path.progress || 0))}%`,
+                    backgroundColor: i === 0 ? '#E03E2D' : '#141413',
                   }}
                 />
               </div>

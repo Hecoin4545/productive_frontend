@@ -1,50 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  BookOpen, Plus, Clock, CheckCircle, Target, Layers, Calendar,
-  ChevronRight, Play, FileText, CheckSquare, Bookmark, ArrowLeft,
-  Edit, Edit3, Trash2, ChevronDown, Check, AlertCircle, ExternalLink
+  BookOpen, ArrowLeft, Calendar, Tag, FileText, Sparkles, CheckCircle2
 } from 'lucide-react';
-import {
-  getFullLearningPath, createModule, updateModule, deleteModule,
-  createTopic, updateTopic, deleteTopic, createTodo, createResource
-} from '../services/api';
-import { useTimer } from '../context/TimerContext';
+import { getFullLearningPath } from '../services/api';
 import LearningPathBlogs from '../components/LearningPathBlogs';
+import '../index.css';
 
 export default function LearningPathDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { startTimer } = useTimer();
 
   const [pathData, setPathData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('roadmap'); // 'roadmap' | 'blogs'
   const [blogCount, setBlogCount] = useState(0);
-
-  // Modals state
-  const [showAddModule, setShowAddModule] = useState(false);
-  const [moduleTitle, setModuleTitle] = useState('');
-  const [moduleDesc, setModuleDesc] = useState('');
-
-  const [showAddTopic, setShowAddTopic] = useState(false);
-  const [targetModuleId, setTargetModuleId] = useState(null);
-  const [topicTitle, setTopicTitle] = useState('');
-  const [topicDesc, setTopicDesc] = useState('');
-
-  // Selected Topic Workspace Modal / Drawer
-  const [selectedTopic, setSelectedTopic] = useState(null);
-  const [topicNotes, setTopicNotes] = useState('');
-  const [savingNotes, setSavingNotes] = useState(false);
-
-  // Quick Add Modal state (Resource or Todo attached to Topic)
-  const [showAttachTodo, setShowAttachTodo] = useState(false);
-  const [todoTitle, setTodoTitle] = useState('');
-
-  const [showAttachResource, setShowAttachResource] = useState(false);
-  const [resTitle, setResTitle] = useState('');
-  const [resUrl, setResUrl] = useState('');
-  const [resType, setResType] = useState('link');
 
   const fetchFull = () => {
     setLoading(true);
@@ -63,625 +32,106 @@ export default function LearningPathDetailPage() {
     fetchFull();
   }, [id]);
 
-  // Handle Add Module
-  const handleAddModule = async (e) => {
-    e.preventDefault();
-    if (!moduleTitle.trim()) return;
-    try {
-      const res = await createModule({
-        learningPathId: id,
-        title: moduleTitle,
-        description: moduleDesc
-      });
-      if (res.data?.success) {
-        setShowAddModule(false);
-        setModuleTitle('');
-        setModuleDesc('');
-        fetchFull();
-      }
-    } catch (err) {
-      console.error('Add module error:', err);
-    }
-  };
-
-  // Handle Add Topic
-  const handleAddTopic = async (e) => {
-    e.preventDefault();
-    if (!topicTitle.trim() || !targetModuleId) return;
-    try {
-      const res = await createTopic({
-        learningPathId: id,
-        moduleId: targetModuleId,
-        title: topicTitle,
-        description: topicDesc
-      });
-      if (res.data?.success) {
-        setShowAddTopic(false);
-        setTopicTitle('');
-        setTopicDesc('');
-        fetchFull();
-      }
-    } catch (err) {
-      console.error('Add topic error:', err);
-    }
-  };
-
-  // Toggle Topic Status (Not Started -> In Progress -> Completed)
-  const handleToggleTopicStatus = async (topic, newStatus) => {
-    try {
-      const res = await updateTopic(topic._id, { status: newStatus });
-      if (res.data?.success) {
-        if (selectedTopic?._id === topic._id) {
-          setSelectedTopic({ ...selectedTopic, status: newStatus });
-        }
-        fetchFull();
-      }
-    } catch (err) {
-      console.error('Update topic status error:', err);
-    }
-  };
-
-  // Start Study Session for Topic
-  const handleStartStudySession = (topic, moduleItem) => {
-    startTimer({
-      subject: pathData?.title || 'General',
-      learningPathId: pathData?._id,
-      learningPathName: pathData?.title,
-      moduleId: moduleItem?._id,
-      moduleName: moduleItem?.title,
-      topicId: topic?._id,
-      topicName: topic?.title,
-      mode: 'stopwatch'
-    });
-    navigate('/timer');
-  };
-
-  // Save Topic Notes
-  const handleSaveTopicNotes = async () => {
-    if (!selectedTopic) return;
-    setSavingNotes(true);
-    try {
-      await updateTopic(selectedTopic._id, { notes: topicNotes });
-      setSelectedTopic({ ...selectedTopic, notes: topicNotes });
-      fetchFull();
-    } catch (err) {
-      console.error('Save notes error:', err);
-    } finally {
-      setSavingNotes(false);
-    }
-  };
-
-  // Attach TODO to Topic
-  const handleAttachTodo = async (e) => {
-    e.preventDefault();
-    if (!todoTitle.trim() || !selectedTopic) return;
-    try {
-      await createTodo({
-        title: todoTitle,
-        learningPathId: pathData._id,
-        topicId: selectedTopic._id,
-        type: 'todo'
-      });
-      setShowAttachTodo(false);
-      setTodoTitle('');
-      fetchFull();
-    } catch (err) {
-      console.error('Attach todo error:', err);
-    }
-  };
-
-  // Attach Resource to Topic
-  const handleAttachResource = async (e) => {
-    e.preventDefault();
-    if (!resTitle.trim() || !selectedTopic) return;
-    try {
-      await createResource({
-        title: resTitle,
-        url: resUrl,
-        type: resType,
-        learningPathId: pathData._id,
-        moduleId: selectedTopic.moduleId,
-        topicId: selectedTopic._id
-      });
-      setShowAttachResource(false);
-      setResTitle('');
-      setResUrl('');
-      fetchFull();
-    } catch (err) {
-      console.error('Attach resource error:', err);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="learning-detail-page">
-        <div className="skeleton-box" style={{ height: '300px', borderRadius: 'var(--radius-xl)' }} />
+      <div className="learning-detail-page page-container" style={{ paddingBottom: '60px' }}>
+        <div className="skeleton-box" style={{ height: '220px', borderRadius: '4px', marginBottom: '24px' }} />
+        <div className="skeleton-box" style={{ height: '400px', borderRadius: '4px' }} />
       </div>
     );
   }
 
   if (!pathData) {
     return (
-      <div className="learning-detail-page">
-        <button className="btn btn-ghost" onClick={() => navigate('/learning')}>
-          <ArrowLeft size={16} /> Back to Learning
+      <div className="learning-detail-page page-container" style={{ paddingBottom: '60px' }}>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => navigate('/learning')}
+          style={{ marginBottom: '20px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+        >
+          <ArrowLeft size={14} /> BACK TO LEARNING PATHS
         </button>
-        <div className="empty-chart-box">
-          <h3>Learning path not found</h3>
+        <div className="mx-card" style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary, #141413)' }}>Learning path not found</h3>
+          <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '6px' }}>The requested learning path does not exist or has been removed.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="learning-detail-page">
-      {/* Top Back Navigation */}
-      <button className="btn btn-ghost btn-sm" onClick={() => navigate('/learning')}>
-        <ArrowLeft size={16} /> Back to Learning Paths
-      </button>
-
-      {/* Hero Path Banner */}
-      <div className="path-detail-hero">
-        <div className="path-hero-content">
-          <div className="path-hero-eyebrow">
-            <span className="badge" style={{ backgroundColor: pathData.color }}>{pathData.subject || 'DSA'}</span>
-            <span className="badge-outline">{pathData.difficulty || 'Intermediate'}</span>
-          </div>
-          <h1 className="path-hero-title">{pathData.title}</h1>
-          <p className="path-hero-desc">{pathData.description || 'Comprehensive learning path curriculum.'}</p>
-          {pathData.goal && <div className="path-hero-goal"><Target size={14} /> Goal: {pathData.goal}</div>}
-        </div>
-
-        <div className="path-hero-actions">
-          <button
-            className="btn btn-primary"
-            onClick={() => handleStartStudySession(pathData.modules?.[0]?.topics?.[0], pathData.modules?.[0])}
-          >
-            <Play size={16} />
-            <span>Continue Learning</span>
-          </button>
-          <button className="btn btn-secondary" onClick={() => setActiveTab('blogs')}>
-            <Edit3 size={16} />
-            <span>Write Blog</span>
-          </button>
-          <button className="btn btn-secondary" onClick={() => setShowAddModule(true)}>
-            <Plus size={16} />
-            <span>Add Module</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Summary Cards Row */}
-      <div className="path-summary-grid">
-        <div className="summary-card">
-          <span className="summary-card-title">PROGRESS</span>
-          <span className="summary-card-value">{pathData.progress || 0}%</span>
-          <div className="progress-bar mini">
-            <div className="progress-fill" style={{ width: `${pathData.progress || 0}%`, backgroundColor: pathData.color }} />
-          </div>
-        </div>
-
-        <div className="summary-card">
-          <span className="summary-card-title">TOPICS</span>
-          <span className="summary-card-value">{pathData.completedTopics || 0} / {pathData.totalTopics || 0}</span>
-          <span className="summary-card-footer">Completed</span>
-        </div>
-
-        <div className="summary-card">
-          <span className="summary-card-title">STUDY TIME</span>
-          <span className="summary-card-value">{pathData.formattedStudyTime || '0h'}</span>
-          <span className="summary-card-footer">Total duration</span>
-        </div>
-
-        <div className="summary-card">
-          <span className="summary-card-title">TODOS</span>
-          <span className="summary-card-value">{pathData.completedTodos || 0}</span>
-          <span className="summary-card-footer">Completed tasks</span>
-        </div>
-
-        <div className="summary-card" onClick={() => setActiveTab('blogs')} style={{ cursor: 'pointer' }} title="Click to view stories">
-          <span className="summary-card-title">BLOGS</span>
-          <span className="summary-card-value">{blogCount}</span>
-          <span className="summary-card-footer">Stories written</span>
-        </div>
-
-        <div className="summary-card">
-          <span className="summary-card-title">RESOURCES</span>
-          <span className="summary-card-value">{pathData.totalResources || 0}</span>
-          <span className="summary-card-footer">Attached items</span>
-        </div>
-
-        <div className="summary-card">
-          <span className="summary-card-title">CURRENT TOPIC</span>
-          <span className="summary-card-value topic-highlight">{pathData.currentTopicName || 'None'}</span>
-          <span className="summary-card-footer">Next focus</span>
-        </div>
-      </div>
-
-      {/* Section Tab Navigation */}
-      <div className="learning-tab-nav">
-        <button
-          type="button"
-          className={`learning-tab-btn ${activeTab === 'roadmap' ? 'active' : ''}`}
-          onClick={() => setActiveTab('roadmap')}
+    <div className="learning-detail-page page-container" style={{ paddingBottom: '60px' }}>
+      {/* Top Back Navigation Bar */}
+      <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button 
+          className="btn btn-secondary" 
+          onClick={() => navigate('/learning')}
+          style={{ fontSize: '11px', padding: '6px 14px', fontFamily: 'var(--font-mono)' }}
         >
-          <Layers size={16} />
-          <span>Curriculum & Roadmap</span>
+          <ArrowLeft size={13} /> BACK TO LEARNING TRACKS
         </button>
-        <button
-          type="button"
-          className={`learning-tab-btn ${activeTab === 'blogs' ? 'active' : ''}`}
-          onClick={() => setActiveTab('blogs')}
-        >
-          <BookOpen size={16} />
-          <span>Blogs & Stories</span>
-          <span className="learning-tab-badge">{blogCount}</span>
-        </button>
+
+        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.06em' }}>
+          TRACK ID // {pathData._id?.slice(-8).toUpperCase()}
+        </span>
       </div>
 
-      {/* Main Tab Content */}
-      {activeTab === 'roadmap' ? (
-        <div className="roadmap-section">
-          <div className="section-header">
-            <div>
-              <h2>Learning Roadmap</h2>
-              <p>Modules and topics structured sequentially</p>
-            </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowAddModule(true)}>
-              <Plus size={14} /> Add Module
-            </button>
-          </div>
-
-          <div className="modules-roadmap-list">
-            {pathData.modules?.length > 0 ? (
-              pathData.modules.map((mod, modIdx) => (
-                <div key={mod._id} className="module-card">
-                  <div className="module-header">
-                    <div className="module-title-group">
-                      <span className="module-order-num">{String(modIdx + 1).padStart(2, '0')}</span>
-                      <div>
-                        <h3 className="module-title">{mod.title}</h3>
-                        {mod.description && <p className="module-desc">{mod.description}</p>}
-                      </div>
-                    </div>
-
-                    <div className="module-meta">
-                      <span className="module-progress-badge">{mod.progress || 0}% Complete</span>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => {
-                          setTargetModuleId(mod._id);
-                          setShowAddTopic(true);
-                        }}
-                      >
-                        <Plus size={14} /> Topic
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Topics List */}
-                  <div className="topics-list">
-                    {mod.topics?.length > 0 ? (
-                      mod.topics.map((tp) => (
-                        <div
-                          key={tp._id}
-                          className={`topic-row-item status-${tp.status}`}
-                          onClick={() => {
-                            setSelectedTopic(tp);
-                            setTopicNotes(tp.notes || '');
-                          }}
-                        >
-                          <div className="topic-status-icon">
-                            {tp.status === 'completed' ? (
-                              <CheckCircle size={18} className="icon-completed" />
-                            ) : tp.status === 'in_progress' ? (
-                              <div className="dot-in-progress" />
-                            ) : (
-                              <div className="dot-not-started" />
-                            )}
-                          </div>
-
-                          <div className="topic-info-col">
-                            <span className="topic-title">{tp.title}</span>
-                            {tp.description && <span className="topic-desc">{tp.description}</span>}
-                          </div>
-
-                          <div className="topic-badges-col">
-                            <span className="topic-meta-badge"><Clock size={12} /> {tp.formattedStudyTime}</span>
-                            <span className="topic-meta-badge"><Bookmark size={12} /> {tp.resourceCount}</span>
-                            <span className="topic-meta-badge"><CheckSquare size={12} /> {tp.todoCount}</span>
-                          </div>
-
-                          <button
-                            className="btn btn-primary btn-sm topic-study-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleStartStudySession(tp, mod);
-                            }}
-                          >
-                            <Play size={12} /> Study
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="empty-topic-placeholder">
-                        <span>No topics added yet.</span>
-                        <button
-                          className="btn btn-link btn-sm"
-                          onClick={() => {
-                            setTargetModuleId(mod._id);
-                            setShowAddTopic(true);
-                          }}
-                        >
-                          + Add first topic
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-chart-box">
-                <Layers size={36} />
-                <p>No modules created yet. Add your first module to build the roadmap.</p>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowAddModule(true)}>
-                  <Plus size={16} /> Add Module
-                </button>
-              </div>
+      {/* Path Header Banner */}
+      <div 
+        className="mx-card" 
+        style={{ 
+          marginBottom: '24px', 
+          padding: '24px 28px',
+          borderLeft: `4px solid ${pathData.color || 'var(--color-text-primary, #141413)'}`,
+          background: 'var(--color-surface, #FFFFFF)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span 
+              className="telemetry-tag"
+              style={{ 
+                background: pathData.color ? `${pathData.color}15` : 'rgba(20,20,19,0.06)',
+                color: pathData.color || 'var(--color-text-primary, #141413)',
+                borderColor: pathData.color || 'var(--color-border)',
+                fontWeight: 700
+              }}
+            >
+              ● {pathData.subject || 'GENERAL'}
+            </span>
+            <span className="telemetry-tag">
+              {pathData.difficulty || 'INTERMEDIATE'}
+            </span>
+            {pathData.targetDate && (
+              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={12} /> Target: {new Date(pathData.targetDate).toLocaleDateString()}
+              </span>
             )}
           </div>
-        </div>
-      ) : (
-        <LearningPathBlogs
-          learningPathId={pathData._id}
-          learningPathTitle={pathData.title}
-          initialBlogs={pathData.blogs || []}
-          onBlogCountChange={setBlogCount}
-        />
-      )}
 
-      {/* Selected Topic Workspace Drawer / Modal */}
-      {selectedTopic && (
-        <div className="modal-backdrop" onClick={() => setSelectedTopic(null)}>
-          <div className="topic-drawer" onClick={e => e.stopPropagation()}>
-            <div className="drawer-header">
-              <div>
-                <span className="drawer-eyebrow">TOPIC WORKSPACE</span>
-                <h2>{selectedTopic.title}</h2>
-              </div>
-              <button className="modal-close-btn" onClick={() => setSelectedTopic(null)}>×</button>
-            </div>
-
-            <div className="drawer-body">
-              {/* Status Actions */}
-              <div className="status-selector-row">
-                <span>Status:</span>
-                <button
-                  className={`status-btn ${selectedTopic.status === 'not_started' ? 'active' : ''}`}
-                  onClick={() => handleToggleTopicStatus(selectedTopic, 'not_started')}
-                >
-                  Not Started
-                </button>
-                <button
-                  className={`status-btn ${selectedTopic.status === 'in_progress' ? 'active' : ''}`}
-                  onClick={() => handleToggleTopicStatus(selectedTopic, 'in_progress')}
-                >
-                  In Progress
-                </button>
-                <button
-                  className={`status-btn ${selectedTopic.status === 'completed' ? 'active' : ''}`}
-                  onClick={() => handleToggleTopicStatus(selectedTopic, 'completed')}
-                >
-                  Completed ✓
-                </button>
-              </div>
-
-              {/* Main Quick Action Buttons */}
-              <div className="topic-action-buttons">
-                <button
-                  className="btn btn-primary"
-                  onClick={() => handleStartStudySession(selectedTopic, pathData.modules?.find(m => String(m._id) === String(selectedTopic.moduleId)))}
-                >
-                  <Play size={16} /> Start Studying
-                </button>
-                <button className="btn btn-secondary" onClick={() => setShowAttachResource(true)}>
-                  <Bookmark size={16} /> Add Resource
-                </button>
-                <button className="btn btn-secondary" onClick={() => setShowAttachTodo(true)}>
-                  <CheckSquare size={16} /> Add TODO
-                </button>
-              </div>
-
-              {/* Stats overview */}
-              <div className="topic-stats-row">
-                <div className="topic-stat-box">
-                  <span className="val">{selectedTopic.formattedStudyTime}</span>
-                  <span className="lbl">Study Time</span>
-                </div>
-                <div className="topic-stat-box">
-                  <span className="val">{selectedTopic.resourceCount}</span>
-                  <span className="lbl">Resources</span>
-                </div>
-                <div className="topic-stat-box">
-                  <span className="val">{selectedTopic.todoCount}</span>
-                  <span className="lbl">TODOs</span>
-                </div>
-              </div>
-
-              {/* Notes Editor */}
-              <div className="topic-notes-section">
-                <div className="notes-header">
-                  <FileText size={16} />
-                  <span>Topic Notes & Key Concepts</span>
-                </div>
-                <textarea
-                  rows="6"
-                  placeholder="Write your study notes, formulas, or key insights here..."
-                  value={topicNotes}
-                  onChange={e => setTopicNotes(e.target.value)}
-                />
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={handleSaveTopicNotes}
-                  disabled={savingNotes}
-                >
-                  {savingNotes ? 'Saving...' : 'Save Notes'}
-                </button>
-              </div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)', background: 'var(--color-bg-subtle, #F4F2EB)', padding: '4px 10px', borderRadius: '3px', border: '1px solid var(--color-border)' }}>
+              <strong>{blogCount}</strong> {blogCount === 1 ? 'ARTICLE' : 'ARTICLES'} PUBLISHED
+            </span>
           </div>
         </div>
-      )}
 
-      {/* Add Module Modal */}
-      {showAddModule && (
-        <div className="modal-backdrop" onClick={() => setShowAddModule(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add New Module</h2>
-              <button className="modal-close-btn" onClick={() => setShowAddModule(false)}>×</button>
-            </div>
-            <form onSubmit={handleAddModule} className="modal-form">
-              <div className="form-group">
-                <label>Module Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Dynamic Programming"
-                  value={moduleTitle}
-                  onChange={e => setModuleTitle(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  rows="2"
-                  placeholder="Brief summary of this module..."
-                  value={moduleDesc}
-                  onChange={e => setModuleDesc(e.target.value)}
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowAddModule(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Add Module</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        <h1 style={{ fontSize: '24px', fontWeight: 800, margin: '4px 0 8px 0', color: 'var(--color-text-primary, #141413)', letterSpacing: '-0.02em' }}>
+          {pathData.title}
+        </h1>
 
-      {/* Add Topic Modal */}
-      {showAddTopic && (
-        <div className="modal-backdrop" onClick={() => setShowAddTopic(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add New Topic</h2>
-              <button className="modal-close-btn" onClick={() => setShowAddTopic(false)}>×</button>
-            </div>
-            <form onSubmit={handleAddTopic} className="modal-form">
-              <div className="form-group">
-                <label>Topic Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Memoization Patterns"
-                  value={topicTitle}
-                  onChange={e => setTopicTitle(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  rows="2"
-                  placeholder="What is covered in this topic?"
-                  value={topicDesc}
-                  onChange={e => setTopicDesc(e.target.value)}
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowAddTopic(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Add Topic</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.6, maxWidth: '850px' }}>
+          {pathData.description || 'Dedicated technical learning journal and knowledge repository. Document algorithms, concepts, code snippets, and research insights.'}
+        </p>
+      </div>
 
-      {/* Attach TODO Modal */}
-      {showAttachTodo && (
-        <div className="modal-backdrop" onClick={() => setShowAttachTodo(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add TODO to Topic</h2>
-              <button className="modal-close-btn" onClick={() => setShowAttachTodo(false)}>×</button>
-            </div>
-            <form onSubmit={handleAttachTodo} className="modal-form">
-              <div className="form-group">
-                <label>Task Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Solve 5 DP problems on Codeforces"
-                  value={todoTitle}
-                  onChange={e => setTodoTitle(e.target.value)}
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowAttachTodo(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Add TODO</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Attach Resource Modal */}
-      {showAttachResource && (
-        <div className="modal-backdrop" onClick={() => setShowAttachResource(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add Resource to Topic</h2>
-              <button className="modal-close-btn" onClick={() => setShowAttachResource(false)}>×</button>
-            </div>
-            <form onSubmit={handleAttachResource} className="modal-form">
-              <div className="form-group">
-                <label>Resource Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. NeetCode 150 DP Course"
-                  value={resTitle}
-                  onChange={e => setResTitle(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>URL (Optional)</label>
-                <input
-                  type="url"
-                  placeholder="https://youtube.com/..."
-                  value={resUrl}
-                  onChange={e => setResUrl(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label>Type</label>
-                <select value={resType} onChange={e => setResType(e.target.value)}>
-                  <option value="link">Link</option>
-                  <option value="video">Video</option>
-                  <option value="article">Article</option>
-                  <option value="documentation">Documentation</option>
-                  <option value="github">GitHub</option>
-                  <option value="note">Personal Note</option>
-                </select>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowAttachResource(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save Resource</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Dedicated Blogs & Technical Writing Section */}
+      <LearningPathBlogs
+        learningPathId={pathData._id}
+        learningPathTitle={pathData.title}
+        initialBlogs={pathData.blogs || []}
+        onBlogCountChange={setBlogCount}
+      />
     </div>
   );
 }

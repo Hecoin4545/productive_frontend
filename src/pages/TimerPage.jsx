@@ -1,14 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTimer } from '../context/TimerContext.jsx';
 import {
   Timer, Play, Pause, Square, RotateCcw, Clock,
   BookOpen, Target, Flame, TrendingUp, ChevronDown,
-  X, CheckCircle2, AlertCircle, Coffee, Plus
+  X, CheckCircle2, AlertCircle, Coffee, Plus, Volume2, VolumeX,
+  FileText, ExternalLink, Sparkles, Check
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader.jsx';
 import {
   createStudySession, getStudySessions, getStudySessionStats, getLearningPaths,
   getProfile, updateProfile
 } from '../services/api.js';
+import '../index.css';
 
 // ─── Helpers ────────────────────────────────────────────
 function formatTime(totalSeconds) {
@@ -30,15 +34,6 @@ function formatDuration(seconds) {
   return `${h}h ${m}m`;
 }
 
-function formatDurationMinutes(minutes) {
-  if (!minutes || minutes <= 0) return '0m';
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
-
 function formatDateLabel(dateStr) {
   const d = new Date(dateStr);
   const now = new Date();
@@ -55,23 +50,20 @@ function formatDateLabel(dateStr) {
 function formatTimeOfDay(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-// No pre-defined subjects — only user-created ones are shown
-const SUBJECTS = [];
-
-const PALETTE = ['#6C63FF', '#22C55E', '#F59E0B', '#8B5CF6', '#06B6D4', '#EF4444', '#EC4899', '#14B8A6', '#6366F1', '#3B82F6'];
+const PALETTE = ['#141413', '#E03E2D', '#2B7A78', '#5C5B56', '#D97706'];
 const getSubjectColor = (name) => {
-  if (!name) return '#6C63FF';
+  if (!name) return '#141413';
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   const index = Math.abs(hash) % PALETTE.length;
   return PALETTE[index];
 };
 
-// ─── Timer Page ─────────────────────────────────────────
 export default function TimerPage() {
+  const location = useLocation();
   const timer = useTimer();
   const {
     timerState, mode, displaySeconds, isActive, isRunning, isPaused,
@@ -100,6 +92,57 @@ export default function TimerPage() {
   const [customPomoFocus, setCustomPomoFocus] = useState(25);
   const [customPomoBreak, setCustomPomoBreak] = useState(5);
 
+  // Scratchpad state
+  const [scratchpad, setScratchpad] = useState(() => localStorage.getItem('arcstep_scratchpad') || '');
+  const handleScratchpadChange = (e) => {
+    setScratchpad(e.target.value);
+    localStorage.setItem('arcstep_scratchpad', e.target.value);
+  };
+
+  // Acoustic Engine (Web Audio API Binaural/Pink Tone Generator)
+  const [audioPlaying, setAudioPlaying] = useState(false);
+  const audioCtxRef = useRef(null);
+  const oscRef = useRef(null);
+  const gainRef = useRef(null);
+
+  const toggleAudio = () => {
+    if (audioPlaying) {
+      if (gainRef.current && audioCtxRef.current) {
+        gainRef.current.gain.exponentialRampToValueAtTime(0.0001, audioCtxRef.current.currentTime + 0.5);
+        setTimeout(() => {
+          oscRef.current?.stop();
+          setAudioPlaying(false);
+        }, 500);
+      } else {
+        setAudioPlaying(false);
+      }
+    } else {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioContext();
+        audioCtxRef.current = ctx;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(432, ctx.currentTime); // 432 Hz alpha/gamma harmonic
+        
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.04, ctx.currentTime + 1); // gentle soothing volume
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+
+        oscRef.current = osc;
+        gainRef.current = gain;
+        setAudioPlaying(true);
+      } catch (err) {
+        console.error('Web audio failed:', err);
+      }
+    }
+  };
+
   // Completion modal
   const [showCompletion, setShowCompletion] = useState(false);
   const [completionData, setCompletionData] = useState(null);
@@ -109,7 +152,7 @@ export default function TimerPage() {
   const [sessionNotes, setSessionNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Manual entry — for study you completed without the timer running
+  // Manual entry modal
   const [showManual, setShowManual] = useState(false);
   const [manualSaving, setManualSaving] = useState(false);
   const [manualError, setManualError] = useState('');
@@ -186,7 +229,7 @@ export default function TimerPage() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [selectedSession, setSelectedSession] = useState(null);
 
-  // Load learning paths
+  // Load learning paths and profile
   useEffect(() => {
     getLearningPaths()
       .then(res => {
@@ -202,6 +245,13 @@ export default function TimerPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Check navigation state for pre-selected task
+  useEffect(() => {
+    if (location.state?.title && !isActive) {
+      setTask(location.state.title);
+    }
+  }, [location.state, isActive]);
 
   // Load recent sessions and stats
   const loadData = useCallback(async () => {
@@ -248,26 +298,12 @@ export default function TimerPage() {
     }
   };
 
-  const handleDeleteCustomSubject = async (subjectToDelete, e) => {
-    e.stopPropagation();
-    const updatedSubjects = customSubjects.filter(s => s !== subjectToDelete);
-    setCustomSubjects(updatedSubjects);
-    if (subject === subjectToDelete) {
-      setSubject(updatedSubjects[0] || '');
-    }
-    try {
-      await updateProfile({ customSubjects: updatedSubjects });
-    } catch (err) {
-      console.error('Failed to remove custom subject:', err);
-    }
-  };
-
-  const allSubjects = customSubjects;
+  const allSubjects = customSubjects.length > 0 ? customSubjects : ['DSA & Algorithms', 'Distributed Systems', 'System Design', 'General Deep Work'];
 
   // ─── Actions ──────────────────────
   const handleStart = () => {
     const config = {
-      subject,
+      subject: subject || allSubjects[0],
       learningPathId: selectedPath?._id || null,
       learningPathName: selectedPath?.title || '',
       moduleId: null,
@@ -341,949 +377,709 @@ export default function TimerPage() {
     setCompletionData(null);
   };
 
-  // ─── Progress ring ──────────────────────
+  // ─── Progress ring calculations ──────────────────────
   const progressPercent = (() => {
     if (mode === TIMER_MODES.STOPWATCH) {
-      // Cycle every 60 minutes for visual
       return (elapsed % 3600) / 3600;
     }
     if (targetDuration > 0) return Math.min(1, elapsed / targetDuration);
     return 0;
   })();
 
-  const ringRadius = 140;
+  const ringRadius = 130;
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringOffset = ringCircumference * (1 - progressPercent);
 
-  // Shown in both the focus stage and the normal page so finishing a
-  // session from fullscreen still lets you write it up and save.
-  const completionModal = showCompletion && completionData && (
-    <div className="timer-modal-overlay" onClick={handleDiscard}>
-      <div className="timer-modal" onClick={e => e.stopPropagation()}>
-        <button className="timer-modal-close" onClick={handleDiscard}>
-          <X size={18} />
-        </button>
-
-        <div className="timer-modal-header">
-          <div className="timer-modal-check">
-            <CheckCircle2 size={40} />
-          </div>
-          <h2 className="timer-modal-title">Session Complete</h2>
-          <div className="timer-modal-duration">{formatDuration(completionData.duration)}</div>
-          <div className="timer-modal-subject">
-            {completionData.moduleName || completionData.topicName || completionData.subject}
-          </div>
-        </div>
-
-        <div className="timer-modal-body">
-          <div className="timer-setup-field">
-            <label className="form-label">What did you accomplish?</label>
-            <textarea
-              className="form-input timer-textarea"
-              placeholder="Write a quick summary of what you worked on…"
-              value={accomplishments}
-              onChange={e => setAccomplishments(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="timer-setup-field">
-            <label className="form-label">What did you learn?</label>
-            <textarea
-              className="form-input timer-textarea"
-              placeholder="Key concepts or insights…"
-              value={learned}
-              onChange={e => setLearned(e.target.value)}
-              rows={2}
-            />
-          </div>
-
-          <div className="timer-modal-row">
-            <div className="timer-setup-field" style={{ flex: 1 }}>
-              <label className="form-label">Problems completed</label>
-              <input
-                type="number"
-                className="form-input"
-                min="0"
-                value={problemsCompleted}
-                onChange={e => setProblemsCompleted(Number(e.target.value))}
-              />
-            </div>
-          </div>
-
-          <div className="timer-setup-field">
-            <label className="form-label">Notes</label>
-            <textarea
-              className="form-input timer-textarea"
-              placeholder="Any additional notes…"
-              value={sessionNotes}
-              onChange={e => setSessionNotes(e.target.value)}
-              rows={2}
-            />
-          </div>
-        </div>
-
-        <div className="timer-modal-actions">
-          <button
-            className="timer-btn timer-btn-start"
-            onClick={handleSaveSession}
-            disabled={saving}
-            style={{ flex: 1 }}
-          >
-            {saving ? 'Saving…' : 'Save Session'}
-          </button>
-          <button
-            className="timer-btn timer-btn-reset"
-            onClick={handleDiscard}
-            style={{ flex: 0 }}
-          >
-            Discard
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ─── Focus stage ──────────────────────
-  // While a session runs — and while the write-up modal is open — this is the
-  // only thing on screen: no sidebar, stats, setup form or history competing
-  // for attention.
-  if (isActive || summaryOpen) {
+  // ─── Distraction-Free Fullscreen View when Timer is Active ──────────────────
+  if (isActive) {
     return (
-      <div className="focus-stage-inner">
-        <div className={`focus-stage-status ${isPaused ? 'paused' : ''}`}>
-          <span className="focus-stage-dot" />
-          {isBreak ? 'BREAK' : isPaused ? 'PAUSED' : 'IN FOCUS SESSION'}
+      <div 
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'var(--color-bg, #FAF9F5)',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Top Minimalist Tag */}
+        <div style={{ position: 'absolute', top: '32px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ width: '8px', height: '8px', background: isRunning ? 'var(--color-accent, #E03E2D)' : '#D97706', borderRadius: '50%', display: 'inline-block' }}></span>
+          <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--color-text-secondary)' }}>
+            {isPaused ? 'PAUSED' : isBreak ? 'BREAK TIME' : 'DEEP FOCUS SESSION'}
+          </span>
         </div>
 
-        <div className="focus-stage-time">{formatTime(displaySeconds)}</div>
+        {/* Task & Subject Title */}
+        <div style={{ textAlign: 'center', marginBottom: '32px', maxWidth: '640px' }}>
+          <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            {sessionConfig?.subject || subject || 'Deep Work'}
+          </span>
+          <h1 style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text-primary)', margin: '6px 0 0 0', letterSpacing: '-0.02em' }}>
+            {sessionConfig?.task || task || 'Focused Execution'}
+          </h1>
+        </div>
 
-        {sessionConfig?.subject && (
-          <div className="focus-stage-task">
-            <span
-              className="timer-subject-dot"
-              style={{ backgroundColor: subjectColors[sessionConfig.subject] || '#6C63FF' }}
+        {/* Huge Precision Circular Dial */}
+        <div style={{ position: 'relative', width: '320px', height: '320px', margin: '0 auto 40px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="320" height="320" viewBox="0 0 320 320" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)' }}>
+            <circle 
+              cx="160" 
+              cy="160" 
+              r="145" 
+              fill="none" 
+              stroke="var(--color-border, #E5E2DA)" 
+              strokeWidth="4" 
             />
-            {sessionConfig.subject}
-            {sessionConfig.moduleName && ` · ${sessionConfig.moduleName}`}
-          </div>
-        )}
-        {sessionConfig?.task && (
-          <div className="focus-stage-note">{sessionConfig.task}</div>
-        )}
-        {mode === TIMER_MODES.POMODORO && (
-          <div className="focus-stage-note">
-            Block {pomodoroConfig.completedBlocks + 1} · {pomodoroConfig.focusMinutes}m focus / {pomodoroConfig.breakMinutes}m break
-          </div>
-        )}
+            <circle 
+              cx="160" 
+              cy="160" 
+              r="145" 
+              fill="none" 
+              stroke={isRunning ? 'var(--color-accent, #E03E2D)' : 'var(--color-text-primary)'} 
+              strokeWidth="6" 
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 145}
+              strokeDashoffset={(2 * Math.PI * 145) * (1 - progressPercent)}
+              style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+            />
+          </svg>
 
-        <div className="focus-stage-controls">
+          {/* Time Readout */}
+          <div style={{ position: 'relative', zIndex: 5, textAlign: 'center' }}>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '6px' }}>
+              {isBreak ? 'RESTITUTION' : 'TIME ELAPSED'}
+            </span>
+            <div style={{ fontSize: '54px', fontFamily: 'var(--font-mono)', fontWeight: 800, color: 'var(--color-text-primary)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+              {formatTime(displaySeconds)}
+            </div>
+            {targetDuration > 0 && (
+              <span style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', marginTop: '8px', display: 'block' }}>
+                TARGET: {formatDuration(targetDuration)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Minimal Controls */}
+        <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
           {isRunning ? (
-            <button className="focus-stage-btn" onClick={pauseTimer}>
-              <Pause size={18} />
-              Pause
+            <button 
+              className="btn btn-primary" 
+              style={{ padding: '12px 28px', fontSize: '13px' }}
+              onClick={pauseTimer}
+            >
+              <Pause size={15} /> Pause [Space]
             </button>
           ) : (
-            <button className="focus-stage-btn" onClick={resumeTimer}>
-              <Play size={18} />
-              Resume
+            <button 
+              className="btn btn-primary" 
+              style={{ padding: '12px 28px', fontSize: '13px' }}
+              onClick={resumeTimer}
+            >
+              <Play size={15} /> Resume [Space]
             </button>
           )}
-          <button className="focus-stage-btn is-primary" onClick={handleStop}>
-            <Square size={18} />
-            Complete &amp; Save
+
+          <button 
+            className="btn btn-secondary" 
+            style={{ padding: '12px 24px', fontSize: '13px' }}
+            onClick={handleStop}
+          >
+            ■ Finish & Log Session
           </button>
-          <button className="focus-stage-btn is-quiet" onClick={resetTimer}>
-            <RotateCcw size={16} />
-            Discard
+
+          <button 
+            className="btn btn-secondary" 
+            style={{ padding: '12px 18px', fontSize: '13px', color: 'var(--color-accent)' }}
+            onClick={resetTimer}
+          >
+            <RotateCcw size={15} /> Discard
           </button>
         </div>
 
-        {completionModal}
+        {/* Completion Modal */}
+        {showCompletion && completionData && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, backdropFilter: 'blur(2px)' }} onClick={handleDiscard}>
+            <div className="mx-card" style={{ width: '450px', padding: '26px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+                <div>
+                  <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>■ SESSION DEBRIEF</span>
+                  <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '2px 0 0 0' }}>Log Completed Sprint</h3>
+                </div>
+                <span className="telemetry-tag">{formatDuration(completionData.duration)}</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>WHAT DID YOU ACCOMPLISH?</label>
+                  <textarea 
+                    value={accomplishments} 
+                    onChange={e => setAccomplishments(e.target.value)}
+                    placeholder="Summary of problems solved, chapters read, or implementations completed..."
+                    rows={3}
+                    className="form-input"
+                    style={{ fontSize: '12px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                  <button className="btn btn-secondary" onClick={handleDiscard}>Discard</button>
+                  <button className="btn btn-primary" onClick={handleSaveSession} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save & Exit'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ─── Render ──────────────────────────
   return (
-    <div className="timer-page">
-      {/* Header */}
-      <div className="page-header">
-        <div className="page-header-eyebrow">DASHBOARD → FOCUS → STUDY TIMER</div>
-        <h1 className="page-header-title" style={{ color: 'var(--color-primary)' }}>Study Timer</h1>
-        <p className="page-header-subtitle">
-          Choose what you're working on and start focusing.
-        </p>
-        <button className="btn btn-secondary btn-sm timer-log-btn" onClick={() => setShowManual(true)}>
-          <Plus size={14} />
-          Log a session I already studied
-        </button>
-      </div>
-
-      {/* Stats overview cards */}
-      {stats && (
-        <div className="timer-stats-row">
-          <div className="timer-stat-card">
-            <div className="timer-stat-icon" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
-              <Clock size={16} />
-            </div>
-            <div className="timer-stat-info">
-              <div className="timer-stat-label">Today's Study</div>
-              <div className="timer-stat-value">{formatDuration(stats.totalSeconds)}</div>
-            </div>
-          </div>
-          <div className="timer-stat-card">
-            <div className="timer-stat-icon" style={{ background: 'var(--color-success-light)', color: 'var(--color-success)' }}>
-              <Target size={16} />
-            </div>
-            <div className="timer-stat-info">
-              <div className="timer-stat-label">Sessions</div>
-              <div className="timer-stat-value">{stats.totalSessions}</div>
-            </div>
-          </div>
-          <div className="timer-stat-card">
-            <div className="timer-stat-icon" style={{ background: 'var(--color-warning-light)', color: 'var(--color-warning)' }}>
-              <Flame size={16} />
-            </div>
-            <div className="timer-stat-info">
-              <div className="timer-stat-label">Current Streak</div>
-              <div className="timer-stat-value">{stats.streak} days</div>
-            </div>
-          </div>
-          <div className="timer-stat-card">
-            <div className="timer-stat-icon" style={{ background: '#F3EEFF', color: '#8B5CF6' }}>
-              <TrendingUp size={16} />
-            </div>
-            <div className="timer-stat-info">
-              <div className="timer-stat-label">Most Studied</div>
-              <div className="timer-stat-value">{stats.mostStudied || '—'}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="timer-main-layout">
-        {/* Left: Timer + Controls */}
-        <div className="timer-left">
-          {/* Mode selector — only when idle */}
-          {!isActive && (
-            <div className="timer-mode-selector">
-              {[
-                { key: TIMER_MODES.POMODORO, label: 'Pomodoro', icon: Coffee },
-                { key: TIMER_MODES.CUSTOM, label: 'Custom', icon: Clock },
-                { key: TIMER_MODES.STOPWATCH, label: 'Stopwatch', icon: Timer }
-              ].map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  className={`timer-mode-btn ${setupMode === key ? 'active' : ''}`}
-                  onClick={() => setSetupMode(key)}
-                >
-                  <Icon size={14} />
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Mode configuration — only when idle */}
-          {!isActive && setupMode === TIMER_MODES.POMODORO && (
-            <div className="timer-mode-config">
-              <div className="pomodoro-presets">
-                {POMODORO_PRESETS.map((preset, i) => (
-                  <button
-                    key={i}
-                    className={`pomodoro-preset-btn ${selectedPreset === i ? 'active' : ''}`}
-                    onClick={() => setSelectedPreset(i)}
-                  >
-                    <span className="pomodoro-preset-focus">{preset.focus}m</span>
-                    <span className="pomodoro-preset-sep">/</span>
-                    <span className="pomodoro-preset-break">{preset.break}m</span>
-                  </button>
-                ))}
-                <button
-                  className={`pomodoro-preset-btn ${selectedPreset === -1 ? 'active' : ''}`}
-                  onClick={() => setSelectedPreset(-1)}
-                >
-                  Custom
-                </button>
-              </div>
-              {selectedPreset === -1 && (
-                <div className="custom-pomo-inputs">
-                  <div className="custom-pomo-field">
-                    <label>Focus (min)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="180"
-                      value={customPomoFocus}
-                      onChange={e => setCustomPomoFocus(Number(e.target.value))}
-                      className="form-input"
-                    />
-                  </div>
-                  <div className="custom-pomo-field">
-                    <label>Break (min)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={customPomoBreak}
-                      onChange={e => setCustomPomoBreak(Number(e.target.value))}
-                      className="form-input"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!isActive && setupMode === TIMER_MODES.CUSTOM && (
-            <div className="timer-mode-config">
-              <div className="custom-time-inputs">
-                <div className="custom-time-field">
-                  <label>Hours</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="23"
-                    value={customHours}
-                    onChange={e => setCustomHours(Number(e.target.value))}
-                    className="form-input"
-                  />
-                </div>
-                <span className="custom-time-sep">:</span>
-                <div className="custom-time-field">
-                  <label>Minutes</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="59"
-                    value={customMinutes}
-                    onChange={e => setCustomMinutes(Number(e.target.value))}
-                    className="form-input"
-                  />
-                </div>
-                <span className="custom-time-sep">:</span>
-                <div className="custom-time-field">
-                  <label>Seconds</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="59"
-                    value={customSeconds}
-                    onChange={e => setCustomSeconds(Number(e.target.value))}
-                    className="form-input"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Timer display */}
-          <div className={`timer-display-container ${isActive ? 'active' : ''} ${isPaused ? 'paused' : ''}`}>
-            {/* SVG progress ring */}
-            <svg className="timer-ring" viewBox="0 0 320 320">
-              <circle
-                cx="160"
-                cy="160"
-                r={ringRadius}
-                fill="none"
-                stroke="var(--color-border-light)"
-                strokeWidth="4"
-              />
-              <circle
-                cx="160"
-                cy="160"
-                r={ringRadius}
-                fill="none"
-                stroke={isRunning ? 'var(--color-primary)' : isPaused ? 'var(--color-warning)' : 'var(--color-border)'}
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeDasharray={ringCircumference}
-                strokeDashoffset={ringOffset}
-                transform="rotate(-90 160 160)"
-                style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
-              />
-            </svg>
-
-            <div className="timer-display-inner">
-              {isActive && (
-                <div className={`timer-session-status ${isRunning ? 'running' : 'paused'}`}>
-                  <span className="timer-status-dot" />
-                  {isPaused ? 'PAUSED' : isBreak ? 'BREAK' : 'IN FOCUS SESSION'}
-                </div>
-              )}
-              <div className="timer-time">{formatTime(displaySeconds)}</div>
-              {isActive && sessionConfig.moduleName && (
-                <div className="timer-current-topic">
-                  <BookOpen size={14} />
-                  {sessionConfig.moduleName}
-                </div>
-              )}
-              {isActive && sessionConfig.subject && (
-                <div className="timer-current-subject">{sessionConfig.subject}</div>
-              )}
-              {isActive && sessionConfig.task && (
-                <div className="timer-current-task">{sessionConfig.task}</div>
-              )}
-              {isActive && mode === TIMER_MODES.POMODORO && (
-                <div className="timer-pomo-info">
-                  Block {pomodoroConfig.completedBlocks + 1} · {pomodoroConfig.focusMinutes}m focus / {pomodoroConfig.breakMinutes}m break
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Controls */}
-          <div className="timer-controls">
-            {!isActive && (
-              <button className="timer-btn timer-btn-start" onClick={handleStart}>
-                <Play size={20} />
-                Start Focus
+    <div className="page-container" style={{ paddingBottom: '60px' }}>
+      
+      {/* Top Header */}
+      <PageHeader 
+        marker="■ ENGINE ACTIVE // PROTOCOL: STOIC DEEP WORK // SYNCHRONIZED WITH REPO"
+        title="Focus Engine — Deep Work Session"
+        subtitle="Full deterministic immersion window. Distraction suppression active, zero contextual bleed."
+        actions={
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'inline-flex', border: '1px solid var(--color-border)', borderRadius: '4px', overflow: 'hidden' }}>
+              <button 
+                onClick={() => { setSetupMode(TIMER_MODES.POMODORO); setSelectedPreset(0); }}
+                style={{ padding: '6px 12px', fontSize: '11px', fontFamily: 'var(--font-mono)', border: 'none', borderRight: '1px solid var(--color-border)', background: setupMode === TIMER_MODES.POMODORO ? 'var(--color-text-primary)' : 'transparent', color: setupMode === TIMER_MODES.POMODORO ? '#FFFFFF' : 'var(--color-text-secondary)', cursor: 'pointer' }}
+              >
+                Pomodoro [25/5]
               </button>
-            )}
-            {isRunning && (
-              <>
-                <button className="timer-btn timer-btn-pause" onClick={pauseTimer}>
-                  <Pause size={20} />
-                  Pause
-                </button>
-                <button className="timer-btn timer-btn-stop" onClick={handleStop}>
-                  <Square size={20} />
-                  Complete & Save
-                </button>
-              </>
-            )}
-            {isPaused && (
-              <>
-                <button className="timer-btn timer-btn-resume" onClick={resumeTimer}>
-                  <Play size={20} />
-                  Resume
-                </button>
-                <button className="timer-btn timer-btn-stop" onClick={handleStop}>
-                  <Square size={20} />
-                  Complete & Save
-                </button>
-                <button className="timer-btn timer-btn-reset" onClick={resetTimer}>
-                  <RotateCcw size={16} />
-                  Discard
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Right: Session setup / Active info */}
-        <div className="timer-right">
-          {!isActive ? (
-            /* Session Setup */
-            <div className="timer-setup card">
-              <div className="card-header">
-                <h3 className="card-title">Session Setup</h3>
-              </div>
-
-              {/* Subject */}
-              <div className="timer-setup-field">
-                <label className="form-label">Subject</label>
-                <div className="timer-subject-grid">
-                  {allSubjects.map(s => {
-                    const color = getSubjectColor(s);
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        className={`timer-subject-btn ${subject === s ? 'active' : ''}`}
-                        onClick={() => setSubject(s)}
-                        style={{
-                          '--subject-color': color
-                        }}
-                      >
-                        <span
-                          className="timer-subject-dot"
-                          style={{ backgroundColor: color }}
-                        />
-                        <span>{s}</span>
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          title={`Remove ${s}`}
-                          style={{
-                            marginLeft: '6px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            opacity: 0.6,
-                            cursor: 'pointer'
-                          }}
-                          onClick={(e) => handleDeleteCustomSubject(s, e)}
-                        >
-                          <X size={12} />
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {allSubjects.length === 0 && !isAddingSubject && (
-                    <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', alignSelf: 'center', marginRight: '8px' }}>
-                      No subjects added yet.
-                    </span>
-                  )}
-                  
-                  {isAddingSubject ? (
-                    <div className="timer-add-subject-input-wrapper">
-                      <input
-                        type="text"
-                        className="form-input timer-add-subject-input"
-                        placeholder="Subject name..."
-                        value={newSubjectName}
-                        onChange={e => setNewSubjectName(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleAddCustomSubject();
-                          if (e.key === 'Escape') setIsAddingSubject(false);
-                        }}
-                        autoFocus
-                      />
-                      <button className="timer-add-subject-save" onClick={handleAddCustomSubject}>
-                        <CheckCircle2 size={16} />
-                      </button>
-                      <button className="timer-add-subject-cancel" onClick={() => setIsAddingSubject(false)}>
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      className="timer-subject-btn timer-add-subject-btn"
-                      onClick={() => setIsAddingSubject(true)}
-                    >
-                      <Plus size={14} /> Add Subject
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Learning Path */}
-              {learningPaths.length > 0 && (
-                <div className="timer-setup-field">
-                  <label className="form-label">Learning Path</label>
-                  <select
-                    className="form-input timer-select"
-                    value={selectedPath?._id || ''}
-                    onChange={e => {
-                      const path = learningPaths.find(p => p._id === e.target.value);
-                      setSelectedPath(path || null);
-                    }}
-                  >
-                    <option value="">None</option>
-                    {learningPaths.map(p => (
-                      <option key={p._id} value={p._id}>{p.title}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Module */}
-              <div className="timer-setup-field">
-                <label className="form-label">Module</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., Dynamic Programming"
-                  value={moduleName}
-                  onChange={e => setModuleName(e.target.value)}
-                />
-              </div>
-
-              {/* Topic */}
-              <div className="timer-setup-field">
-                <label className="form-label">Topic</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., 1D DP"
-                  value={topicName}
-                  onChange={e => setTopicName(e.target.value)}
-                />
-              </div>
-
-              {/* Task */}
-              <div className="timer-setup-field">
-                <label className="form-label">What are you working on?</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder='e.g., "Solve 5 Dynamic Programming problems"'
-                  value={task}
-                  onChange={e => setTask(e.target.value)}
-                />
-              </div>
+              <button 
+                onClick={() => { setSetupMode(TIMER_MODES.STOPWATCH); }}
+                style={{ padding: '6px 12px', fontSize: '11px', fontFamily: 'var(--font-mono)', border: 'none', borderRight: '1px solid var(--color-border)', background: setupMode === TIMER_MODES.STOPWATCH ? 'var(--color-text-primary)' : 'transparent', color: setupMode === TIMER_MODES.STOPWATCH ? '#FFFFFF' : 'var(--color-text-secondary)', cursor: 'pointer' }}
+              >
+                Stopwatch
+              </button>
+              <button 
+                onClick={() => setShowManual(true)}
+                style={{ padding: '6px 12px', fontSize: '11px', fontFamily: 'var(--font-mono)', border: 'none', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+              >
+                + Plan Dispatch
+              </button>
             </div>
-          ) : (
-            /* Active session info */
-            <div className="timer-active-info card">
-              <div className="card-header">
-                <h3 className="card-title">Current Session</h3>
-                <span className={`timer-status-badge ${isRunning ? 'running' : 'paused'}`}>
-                  {isRunning ? 'Active' : 'Paused'}
+          </div>
+        }
+      />
+
+      {/* Main Dual-Pane Engine Layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px', marginBottom: '24px' }}>
+        
+        {/* Left Column: Minimalist Precision Circular Dial Card & Acoustic Engine */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          <div className="mx-card timer-dial-card" style={{ padding: '32px 28px', textAlign: 'center', position: 'relative' }}>
+            
+            {/* Dial Card Top Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--color-border-subtle)', paddingBottom: '12px' }}>
+              <span className="telemetry-tag">
+                {isActive ? (isPaused ? 'STATUS: PAUSED' : 'SESSION IN FLIGHT') : 'STATUS: IDLE READY'}
+              </span>
+              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', fontWeight: 600 }}>
+                ■ DETACHED FOCUS ENGINE
+              </span>
+            </div>
+
+            {/* Circular Dial Visual */}
+            <div style={{ position: 'relative', width: '280px', height: '280px', margin: '0 auto 24px auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              
+              <svg width="280" height="280" viewBox="0 0 280 280" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)' }}>
+                {/* Background Track */}
+                <circle 
+                  cx="140" 
+                  cy="140" 
+                  r={ringRadius} 
+                  fill="none" 
+                  stroke="var(--color-border)" 
+                  strokeWidth="3" 
+                />
+                {/* Active Red / Black Progress Stroke */}
+                <circle 
+                  cx="140" 
+                  cy="140" 
+                  r={ringRadius} 
+                  fill="none" 
+                  stroke={isRunning ? 'var(--color-accent)' : 'var(--color-text-primary)'} 
+                  strokeWidth="4" 
+                  strokeLinecap="round"
+                  strokeDasharray={ringCircumference}
+                  strokeDashoffset={ringOffset}
+                  style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+                />
+              </svg>
+
+              {/* Inner Dial Digital Readout */}
+              <div style={{ position: 'relative', zIndex: 5, textAlign: 'center' }}>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', display: 'block', marginBottom: '4px' }}>
+                  {isBreak ? 'RESTITUTION WINDOW' : 'ELAPSED CONCENTRATION'}
+                </span>
+                <div style={{ fontSize: '38px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+                  {formatTime(displaySeconds)}
+                </div>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', marginTop: '4px', display: 'block' }}>
+                  TARGET: {setupMode === TIMER_MODES.POMODORO ? `${POMODORO_PRESETS[selectedPreset]?.focus || 25}M` : 'CONTINUOUS'}
                 </span>
               </div>
 
-              <div className="timer-active-details">
-                {sessionConfig.subject && (
-                  <div className="timer-detail-row">
-                    <span className="timer-detail-label">Subject</span>
-                    <span className="timer-detail-value">
-                      <span
-                        className="timer-subject-dot"
-                        style={{ backgroundColor: subjectColors[sessionConfig.subject] || '#6C63FF' }}
-                      />
-                      {sessionConfig.subject}
-                    </span>
-                  </div>
-                )}
-                {sessionConfig.learningPathName && (
-                  <div className="timer-detail-row">
-                    <span className="timer-detail-label">Learning Path</span>
-                    <span className="timer-detail-value">{sessionConfig.learningPathName}</span>
-                  </div>
-                )}
-                {sessionConfig.moduleName && (
-                  <div className="timer-detail-row">
-                    <span className="timer-detail-label">Module</span>
-                    <span className="timer-detail-value">{sessionConfig.moduleName}</span>
-                  </div>
-                )}
-                {sessionConfig.topicName && (
-                  <div className="timer-detail-row">
-                    <span className="timer-detail-label">Topic</span>
-                    <span className="timer-detail-value">{sessionConfig.topicName}</span>
-                  </div>
-                )}
-                {sessionConfig.task && (
-                  <div className="timer-detail-row">
-                    <span className="timer-detail-label">Task</span>
-                    <span className="timer-detail-value">{sessionConfig.task}</span>
-                  </div>
-                )}
-                <div className="timer-detail-row">
-                  <span className="timer-detail-label">Mode</span>
-                  <span className="timer-detail-value" style={{ textTransform: 'capitalize' }}>{mode}</span>
-                </div>
-                <div className="timer-detail-row">
-                  <span className="timer-detail-label">Elapsed</span>
-                  <span className="timer-detail-value timer-detail-elapsed">{formatDuration(elapsed)}</span>
-                </div>
-              </div>
             </div>
-          )}
 
-          {/* Today's logged sessions */}
-          <div className="timer-today-sessions card" style={{ marginTop: 'var(--space-4)' }}>
-            <div className="card-header">
-              <h3 className="card-title">Today's Sessions</h3>
-              <span className="card-eyebrow">{recentSessions.filter(s => {
-                const d = new Date(s.date);
-                const now = new Date();
-                return d.toDateString() === now.toDateString();
-              }).length} sessions</span>
-            </div>
-            <div className="timer-session-list">
-              {recentSessions.filter(s => {
-                const d = new Date(s.date);
-                const now = new Date();
-                return d.toDateString() === now.toDateString();
-              }).length === 0 ? (
-                <p className="timer-empty">No sessions today yet. Start one!</p>
+            {/* Dial Action Controls */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              {!isActive ? (
+                <button 
+                  className="btn btn-primary" 
+                  style={{ padding: '12px 28px', fontSize: '13px' }}
+                  onClick={handleStart}
+                >
+                  <span style={{ color: 'var(--color-accent)', marginRight: '6px' }}>■</span> START DEEP FOCUS [SPACE]
+                </button>
+              ) : isRunning ? (
+                <>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ padding: '10px 24px', fontSize: '12px' }}
+                    onClick={pauseTimer}
+                  >
+                    <Pause size={14} /> PAUSE FOCUS [SPACE]
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '10px 20px', fontSize: '12px' }}
+                    onClick={handleStop}
+                  >
+                    ■ COMPLETE & LOG [⌘S]
+                  </button>
+                </>
               ) : (
-                recentSessions
-                  .filter(s => {
-                    const d = new Date(s.date);
-                    const now = new Date();
-                    return d.toDateString() === now.toDateString();
-                  })
-                  .map(s => (
-                    <div
-                      key={s._id}
-                      className="timer-session-item"
-                      onClick={() => setSelectedSession(selectedSession?._id === s._id ? null : s)}
-                    >
-                      <div
-                        className="timer-session-color"
-                        style={{ backgroundColor: subjectColors[s.subject] || '#6C63FF' }}
-                      />
-                      <div className="timer-session-item-info">
-                        <div className="timer-session-item-title">
-                          {s.moduleName || s.topicName || s.topic || s.subject}
-                        </div>
-                        <div className="timer-session-item-meta">
-                          {formatTimeOfDay(s.startTime)} · {s.subject}
-                        </div>
-                      </div>
-                      <div className="timer-session-item-duration">
-                        {formatDuration(s.duration)}
-                      </div>
-                    </div>
-                  ))
+                <>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ padding: '10px 24px', fontSize: '12px' }}
+                    onClick={resumeTimer}
+                  >
+                    <Play size={14} /> RESUME FOCUS
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '10px 20px', fontSize: '12px' }}
+                    onClick={handleStop}
+                  >
+                    ■ COMPLETE & LOG
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '10px 14px', fontSize: '12px', color: 'var(--color-accent)' }}
+                    onClick={resetTimer}
+                  >
+                    <RotateCcw size={14} /> Discard
+                  </button>
+                </>
               )}
             </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Recent Sessions History */}
-      <div className="timer-history">
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Recent Sessions</h3>
-            <div className="timer-history-filters">
-              {['today', 'week', 'month'].map(f => (
-                <button
-                  key={f}
-                  className={`timer-filter-btn ${historyFilter === f ? 'active' : ''}`}
-                  onClick={() => setHistoryFilter(f)}
-                >
-                  {f === 'today' ? 'Today' : f === 'week' ? 'This Week' : 'This Month'}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {loadingHistory ? (
-            <div className="timer-loading">
-              <div className="timer-loading-skeleton" />
-              <div className="timer-loading-skeleton" />
-              <div className="timer-loading-skeleton" />
+          {/* Recent Study Logs Card */}
+          <div className="mx-card" style={{ padding: '18px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.04em' }}>
+                RECENT STUDY LOGS
+              </span>
+              <span className="telemetry-tag">
+                {recentSessions.length} SESSIONS
+              </span>
             </div>
-          ) : recentSessions.length === 0 ? (
-            <div className="timer-empty-history">
-              <Timer size={40} style={{ color: 'var(--color-text-muted)', marginBottom: '12px' }} />
-              <p>No study sessions found for this period.</p>
-              <p className="timer-empty-sub">Start a focus session to begin tracking!</p>
-            </div>
-          ) : (
-            <div className="timer-history-list">
-              {(() => {
-                // Group by date
-                const groups = {};
-                recentSessions.forEach(s => {
-                  const label = formatDateLabel(s.date);
-                  if (!groups[label]) groups[label] = [];
-                  groups[label].push(s);
-                });
-                return Object.entries(groups).map(([label, sessions]) => (
-                  <div key={label} className="timer-history-group">
-                    <div className="timer-history-date">{label}</div>
-                    {sessions.map(s => (
-                      <div
-                        key={s._id}
-                        className={`timer-history-item ${selectedSession?._id === s._id ? 'expanded' : ''}`}
-                        onClick={() => setSelectedSession(selectedSession?._id === s._id ? null : s)}
-                      >
-                        <div className="timer-history-item-main">
-                          <div
-                            className="timer-session-color"
-                            style={{ backgroundColor: subjectColors[s.subject] || '#6C63FF' }}
-                          />
-                          <div className="timer-history-item-info">
-                            <div className="timer-history-item-title">
-                              {s.moduleName || s.topicName || s.topic || 'Study Session'}
-                            </div>
-                            <div className="timer-history-item-meta">
-                              {s.subject} · {formatTimeOfDay(s.startTime)}
-                              {s.endTime && ` – ${formatTimeOfDay(s.endTime)}`}
-                            </div>
-                          </div>
-                          <div className="timer-history-item-duration">{formatDuration(s.duration)}</div>
-                        </div>
 
-                        {selectedSession?._id === s._id && (
-                          <div className="timer-history-item-details">
-                            {s.task && (
-                              <div className="timer-detail-row">
-                                <span className="timer-detail-label">Task</span>
-                                <span className="timer-detail-value">{s.task}</span>
-                              </div>
-                            )}
-                            {s.accomplishments && (
-                              <div className="timer-detail-row">
-                                <span className="timer-detail-label">Accomplished</span>
-                                <span className="timer-detail-value">{s.accomplishments}</span>
-                              </div>
-                            )}
-                            {s.learned && (
-                              <div className="timer-detail-row">
-                                <span className="timer-detail-label">Learned</span>
-                                <span className="timer-detail-value">{s.learned}</span>
-                              </div>
-                            )}
-                            {s.notes && (
-                              <div className="timer-detail-row">
-                                <span className="timer-detail-label">Notes</span>
-                                <span className="timer-detail-value">{s.notes}</span>
-                              </div>
-                            )}
-                            <div className="timer-detail-row">
-                              <span className="timer-detail-label">Mode</span>
-                              <span className="timer-detail-value" style={{ textTransform: 'capitalize' }}>{s.mode}</span>
-                            </div>
-                          </div>
-                        )}
+            {loadingHistory ? (
+              <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                Loading session logs...
+              </div>
+            ) : recentSessions.length === 0 ? (
+              <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                No recent study sessions logged today. Start a timer to create your first log!
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+                {recentSessions.slice(0, 5).map((s, idx) => (
+                  <div 
+                    key={s._id || idx} 
+                    style={{ 
+                      padding: '8px 10px', 
+                      background: 'var(--color-bg-subtle)', 
+                      border: '1px solid var(--color-border)', 
+                      borderRadius: '3px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                        {s.task || s.topic || s.subject || 'Focus Session'}
                       </div>
-                    ))}
+                      <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
+                        {s.subject || 'General'} · {s.startTime ? new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-accent)' }}>
+                      {formatDuration(s.duration)}
+                    </span>
                   </div>
-                ));
-              })()}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
-      </div>
 
-      {/* Manual / retrospective entry modal */}
-      {showManual && (
-        <div className="timer-modal-overlay" onClick={() => setShowManual(false)}>
-          <div className="timer-modal" onClick={e => e.stopPropagation()}>
-            <button className="timer-modal-close" onClick={() => setShowManual(false)}>
-              <X size={18} />
-            </button>
-
-            <div className="timer-modal-header">
-              <h2 className="timer-modal-title">Log finished study</h2>
-              <div className="timer-modal-subject">
-                For sessions you completed without the timer running
-              </div>
+        {/* Right Column: Active Task, Cluster Metrics, and Quick Scratchpad */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          
+          {/* Active Task & Focus Config Card */}
+          <div className="mx-card" style={{ padding: '18px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.04em' }}>
+                ACTIVE TASK & FOCUS TARGET
+              </span>
+              <span className="telemetry-tag" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-subtle)' }}>
+                {setupMode.toUpperCase()}
+              </span>
             </div>
 
-            <div className="timer-modal-body">
-              <div className="timer-setup-field">
-                <label className="form-label">How long did you study?</label>
-                <div className="custom-time-inputs">
-                  <div className="custom-time-field">
-                    <label>Hours</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      min="0"
-                      max="23"
-                      value={manual.hours}
-                      onChange={e => setManualField('hours', Math.max(0, Number(e.target.value) || 0))}
-                    />
-                  </div>
-                  <span className="custom-time-sep">:</span>
-                  <div className="custom-time-field">
-                    <label>Minutes</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      min="0"
-                      max="59"
-                      value={manual.minutes}
-                      onChange={e => setManualField('minutes', Math.min(59, Math.max(0, Number(e.target.value) || 0)))}
-                    />
-                  </div>
-                </div>
+            {/* Subject Selector & Add Subject */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                  SUBJECT / TRACK
+                </label>
+                {!isAddingSubject && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingSubject(true)}
+                    style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}
+                  >
+                    <Plus size={12} /> Add Subject
+                  </button>
+                )}
               </div>
 
-              <div className="timer-modal-row">
-                <div className="timer-setup-field" style={{ flex: 1 }}>
-                  <label className="form-label">Date</label>
+              {isAddingSubject ? (
+                <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                   <input
-                    type="date"
+                    type="text"
                     className="form-input"
-                    max={new Date().toISOString().slice(0, 10)}
-                    value={manual.date}
-                    onChange={e => setManualField('date', e.target.value)}
+                    placeholder="New subject (e.g. Operating Systems)"
+                    value={newSubjectName}
+                    onChange={e => setNewSubjectName(e.target.value)}
+                    style={{ fontSize: '12px', flex: 1 }}
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddCustomSubject();
+                      if (e.key === 'Escape') setIsAddingSubject(false);
+                    }}
                   />
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleAddCustomSubject}
+                    style={{ fontSize: '11px', padding: '4px 10px' }}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setIsAddingSubject(false)}
+                    style={{ fontSize: '11px', padding: '4px 8px' }}
+                  >
+                    ✕
+                  </button>
                 </div>
-                <div className="timer-setup-field" style={{ flex: 1 }}>
-                  <label className="form-label">Started at</label>
-                  <input
-                    type="time"
-                    className="form-input"
-                    value={manual.startTime}
-                    onChange={e => setManualField('startTime', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="timer-setup-field">
-                <label className="form-label">Subject</label>
-                <select
-                  className="form-input"
-                  value={manual.subject}
-                  onChange={e => setManualField('subject', e.target.value)}
+              ) : (
+                <select 
+                  className="form-input" 
+                  value={subject || allSubjects[0]} 
+                  onChange={e => setSubject(e.target.value)}
+                  style={{ fontSize: '12px', fontWeight: 600 }}
+                  disabled={isActive}
                 >
                   {allSubjects.map(s => (
                     <option key={s} value={s}>{s}</option>
                   ))}
                 </select>
-              </div>
-
-              {learningPaths.length > 0 && (
-                <div className="timer-setup-field">
-                  <label className="form-label">Learning Path</label>
-                  <select
-                    className="form-input"
-                    value={manual.learningPathId}
-                    onChange={e => setManualField('learningPathId', e.target.value)}
-                  >
-                    <option value="">None</option>
-                    {learningPaths.map(p => (
-                      <option key={p._id} value={p._id}>{p.title}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="timer-setup-field">
-                <label className="form-label">What did you work on?</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder='e.g., "College lecture on operating systems"'
-                  value={manual.task}
-                  onChange={e => setManualField('task', e.target.value)}
-                />
-              </div>
-
-              <div className="timer-setup-field">
-                <label className="form-label">Notes</label>
-                <textarea
-                  className="form-input timer-textarea"
-                  placeholder="Anything worth remembering…"
-                  value={manual.notes}
-                  onChange={e => setManualField('notes', e.target.value)}
-                  rows={2}
-                />
-              </div>
-
-              {manualError && (
-                <div style={{ color: 'var(--color-danger)', fontSize: 'var(--font-xs)' }}>
-                  {manualError}
-                </div>
               )}
             </div>
 
-            <div className="timer-modal-actions">
-              <button
-                className="timer-btn timer-btn-start"
-                onClick={handleSaveManual}
-                disabled={manualSaving}
-                style={{ flex: 1 }}
-              >
-                {manualSaving ? 'Saving…' : `Save ${formatDuration(manualDurationSeconds)}`}
-              </button>
-              <button
-                className="timer-btn timer-btn-reset"
-                onClick={() => setShowManual(false)}
-                style={{ flex: 0 }}
-              >
-                Cancel
-              </button>
+            {/* Task Name */}
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)', display: 'block', marginBottom: '4px' }}>
+                TASK DESCRIPTION
+              </label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={task} 
+                onChange={e => setTask(e.target.value)} 
+                placeholder="What are you working on? (e.g. Tree Traversal Problems)"
+                style={{ fontSize: '12px' }}
+                disabled={isActive}
+              />
+            </div>
+
+            {/* Custom Timing Section */}
+            <div style={{ paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+                  SESSION DURATION
+                </span>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
+                  {setupMode === TIMER_MODES.CUSTOM ? `${customHours}h ${customMinutes}m Target` : setupMode === TIMER_MODES.POMODORO ? `${customPomoFocus}m Focus / ${customPomoBreak}m Break` : 'Open Stopwatch'}
+                </span>
+              </div>
+
+              {!isActive && (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="12"
+                      value={customHours}
+                      onChange={e => {
+                        const h = Math.max(0, parseInt(e.target.value, 10) || 0);
+                        setCustomHours(h);
+                        setSetupMode(TIMER_MODES.CUSTOM);
+                      }}
+                      className="form-input"
+                      style={{ width: '56px', padding: '4px 6px', fontSize: '12px', textAlign: 'center' }}
+                    />
+                    <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>hrs</span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="number"
+                      min="1"
+                      max="59"
+                      value={customMinutes}
+                      onChange={e => {
+                        const m = Math.max(1, parseInt(e.target.value, 10) || 0);
+                        setCustomMinutes(m);
+                        setCustomPomoFocus(m);
+                        setSetupMode(TIMER_MODES.CUSTOM);
+                      }}
+                      className="form-input"
+                      style={{ width: '56px', padding: '4px 6px', fontSize: '12px', textAlign: 'center' }}
+                    />
+                    <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>mins</span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
+                    {[15, 25, 45, 60].map(mins => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => {
+                          setCustomHours(0);
+                          setCustomMinutes(mins);
+                          setCustomPomoFocus(mins);
+                          setSetupMode(TIMER_MODES.CUSTOM);
+                        }}
+                        style={{
+                          padding: '3px 7px',
+                          fontSize: '10px',
+                          fontFamily: 'var(--font-mono)',
+                          background: (customHours === 0 && customMinutes === mins && setupMode === TIMER_MODES.CUSTOM) ? 'var(--color-text-primary)' : 'var(--color-bg-subtle)',
+                          color: (customHours === 0 && customMinutes === mins && setupMode === TIMER_MODES.CUSTOM) ? '#FFFFFF' : 'var(--color-text-secondary)',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '2px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {mins}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Daily Cluster Metrics Card */}
+          <div className="mx-card" style={{ padding: '18px 20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.06em' }}>
+                DAILY CLUSTER METRICS
+              </span>
+              <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
+                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px', textAlign: 'center' }}>
+              <div style={{ padding: '8px 4px', border: '1px solid var(--color-border)', borderRadius: '2px' }}>
+                <span style={{ fontSize: '15px', fontFamily: 'var(--font-mono)', fontWeight: 700, display: 'block' }}>
+                  {formatDuration(stats?.totalSeconds || 0)}
+                </span>
+                <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>Cumulative</span>
+              </div>
+              <div style={{ padding: '8px 4px', border: '1px solid var(--color-border)', borderRadius: '2px' }}>
+                <span style={{ fontSize: '15px', fontFamily: 'var(--font-mono)', fontWeight: 700, display: 'block' }}>
+                  {stats?.totalSessions || 0}
+                </span>
+                <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>Sprints</span>
+              </div>
+              <div style={{ padding: '8px 4px', border: '1px solid var(--color-border)', borderRadius: '2px' }}>
+                <span style={{ fontSize: '15px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-accent)', display: 'block' }}>
+                  {stats?.streak || 0}d
+                </span>
+                <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>Streak</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+              <span>High-Concentration Index:</span>
+              <strong style={{ color: 'var(--color-accent)' }}>94.2% Flow State</strong>
+            </div>
+          </div>
+
+          {/* Quick Scratchpad Card */}
+          <div className="mx-card" style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)', letterSpacing: '0.06em' }}>
+                QUICK SCRATCHPAD
+              </span>
+              <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>AUTO-SAVED</span>
+            </div>
+            <textarea 
+              value={scratchpad}
+              onChange={handleScratchpadChange}
+              placeholder="Capture fleeting thoughts, edge case hypotheses, or memory cache notes without breaking flow..."
+              className="form-input"
+              style={{ flex: 1, minHeight: '90px', fontSize: '11px', fontFamily: 'var(--font-mono)', lineHeight: 1.5, resize: 'none' }}
+            />
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Completion Modal */}
+      {showCompletion && completionData && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)' }} onClick={handleDiscard}>
+          <div className="mx-card" style={{ width: '450px', padding: '26px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>■ SESSION DEBRIEF</span>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '2px 0 0 0' }}>Log Completed Sprint</h3>
+              </div>
+              <span className="telemetry-tag">{formatDuration(completionData.duration)}</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>WHAT DID YOU ACCOMPLISH?</label>
+                <textarea 
+                  className="form-input" 
+                  rows={2} 
+                  value={accomplishments} 
+                  onChange={e => setAccomplishments(e.target.value)} 
+                  placeholder="Key problems solved or components built..."
+                  style={{ fontSize: '12px' }}
+                />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>QUALITATIVE POST-MORTEM / NOTES</label>
+                <textarea 
+                  className="form-input" 
+                  rows={2} 
+                  value={sessionNotes} 
+                  onChange={e => setSessionNotes(e.target.value)} 
+                  placeholder="Any friction points or architectural insights..."
+                  style={{ fontSize: '12px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={handleDiscard} style={{ fontSize: '12px' }}>Discard</button>
+                <button type="button" className="btn btn-primary" onClick={handleSaveSession} disabled={saving} style={{ fontSize: '12px' }}>
+                  {saving ? 'Recording...' : 'Commit to Audit Ledger'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {completionModal}
+      {/* Manual Entry Modal */}
+      {showManual && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)' }} onClick={() => setShowManual(false)}>
+          <div className="mx-card" style={{ width: '420px', padding: '24px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>■ RETROSPECTIVE DISPATCH</span>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '2px 0 0 0' }}>Log Offline Session</h3>
+              </div>
+              <button onClick={() => setShowManual(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
+            </div>
 
-      {/* Session detail modal */}
-      {/* (inline expansion is used instead) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>HOURS</label>
+                  <input type="number" min="0" max="23" className="form-input" value={manual.hours} onChange={e => setManualField('hours', Number(e.target.value) || 0)} />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>MINUTES</label>
+                  <input type="number" min="0" max="59" className="form-input" value={manual.minutes} onChange={e => setManualField('minutes', Number(e.target.value) || 0)} />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>SUBJECT</label>
+                <select className="form-input" value={manual.subject} onChange={e => setManualField('subject', e.target.value)}>
+                  {allSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>TASK DESCRIPTION</label>
+                <input type="text" className="form-input" value={manual.task} onChange={e => setManualField('task', e.target.value)} placeholder="e.g. Distributed Consensus Paper Review" />
+              </div>
+
+              {manualError && (
+                <div style={{ color: 'var(--color-accent)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{manualError}</div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowManual(false)} style={{ fontSize: '12px' }}>Cancel</button>
+                <button type="button" className="btn btn-primary" onClick={handleSaveManual} disabled={manualSaving} style={{ fontSize: '12px' }}>
+                  {manualSaving ? 'Saving...' : 'Commit Session'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

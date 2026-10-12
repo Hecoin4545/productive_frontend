@@ -29,7 +29,6 @@ const getDuration = (todo) => {
 };
 
 export default function TodoOverview({ todos: initialTodos }) {
-  // Ensure todos is always an array
   const safeTodos = Array.isArray(initialTodos) ? initialTodos : [];
   const [todos, setTodos] = useState(safeTodos);
   const [showAll, setShowAll] = useState(false);
@@ -49,7 +48,6 @@ export default function TodoOverview({ todos: initialTodos }) {
     };
     setTodos(updated);
 
-    // Persist to backend
     if (todo._id) {
       try {
         await updateTodo(todo._id, {
@@ -57,14 +55,12 @@ export default function TodoOverview({ todos: initialTodos }) {
           completedAt: newCompleted ? new Date() : null
         });
       } catch (err) {
-        // Revert on error
         updated[index] = todo;
         setTodos([...updated]);
       }
     }
   };
 
-  // Safely filter todos to only include those scheduled for today
   const today = new Date();
   const isToday = (dateStr) => {
     if (!dateStr) return false;
@@ -78,7 +74,6 @@ export default function TodoOverview({ todos: initialTodos }) {
   const pendingTodos = todayTodos.filter(t => !t.completed);
   const completedTodos = todayTodos.filter(t => t.completed);
 
-  // Soonest scheduled first
   const bySchedule = (a, b) => {
     const at = a.dueDate ? new Date(a.dueDate).getTime() : null;
     const bt = b.dueDate ? new Date(b.dueDate).getTime() : null;
@@ -95,26 +90,37 @@ export default function TodoOverview({ todos: initialTodos }) {
   return (
     <div className="card fade-in">
       <div className="card-header">
-        <h3 className="card-title">What's next</h3>
+        <div className="card-header-eyebrow-group">
+          <span className="card-header-red-dot">■</span>
+          <h3 className="card-title">CHRONOLOGICAL FLOW // TASK DISPATCH</h3>
+        </div>
         {hasHidden && (
-          <span className="card-link" onClick={() => setShowAll(prev => !prev)}>
-            {showAll ? 'Show less' : `View all ${orderedTodos.length}`}
-            {showAll ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </span>
+          <button
+            type="button"
+            className="card-link-btn"
+            onClick={() => setShowAll(prev => !prev)}
+          >
+            <span>{showAll ? 'Collapse ledger' : `Audit all (${orderedTodos.length})`}</span>
+            {showAll ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          </button>
         )}
       </div>
+
       <div className="todo-list">
         {displayTodos.map((todo) => (
           <div
-            key={todo._id}
+            key={todo._id || todo.title}
             className={`todo-item ${todo.completed ? 'completed' : ''}`}
           >
-            <div
+            <button
+              type="button"
               className={`todo-checkbox ${todo.completed ? 'checked' : ''}`}
               onClick={() => toggleTodo(todos.indexOf(todo))}
+              aria-label={todo.completed ? "Mark incomplete" : "Mark complete"}
             >
               {todo.completed && <Check size={12} />}
-            </div>
+            </button>
+
             <div className="todo-info">
               <div className="todo-title">{todo.title}</div>
               <div className="todo-meta">
@@ -123,36 +129,32 @@ export default function TodoOverview({ todos: initialTodos }) {
                     className="todo-when"
                     title={`Scheduled ${new Date(todo.dueDate).toLocaleString()}`}
                   >
-                    <CalendarDays size={11} />
-                    {formatDayLabel(new Date(todo.dueDate))}
+                    <Clock size={11} />
+                    <span>{formatDayLabel(new Date(todo.dueDate))}</span>
                     {formatTimeLabel(todo) && (
-                      <>
-                        {' at '}
-                        <Clock size={11} />
-                        {formatTimeLabel(todo)}
-                      </>
+                      <span className="todo-time-badge">{formatTimeLabel(todo)}</span>
                     )}
                   </span>
                 )}
-                <span className="todo-tag">{todo.category || todo.learningPathName || 'Unscheduled'}</span>
+                <span className="todo-tag">{todo.category || todo.learningPathName || 'Sprint Block'}</span>
                 {getDuration(todo) !== null && (
                   <span className="todo-duration">{getDuration(todo)} min</span>
                 )}
               </div>
             </div>
+
             {todo.priority && (
-              <span className={`todo-priority ${todo.priority}`} />
+              <span className={`todo-priority-badge ${todo.priority}`}>
+                {todo.priority.toUpperCase()}
+              </span>
             )}
-            <ChevronRight size={14} className="todo-arrow" />
           </div>
         ))}
+
         {orderedTodos.length === 0 && (
-          <div className="todo-item">
-            <div className="todo-info">
-              <div className="todo-title" style={{ color: 'var(--color-text-tertiary)' }}>
-                Nothing scheduled yet
-              </div>
-            </div>
+          <div className="todo-empty-state">
+            <span className="todo-empty-icon">✓</span>
+            <span>Task ledger is clear. No scheduled blocks remain for today.</span>
           </div>
         )}
       </div>

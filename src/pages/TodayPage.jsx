@@ -6,7 +6,6 @@ import PageHeader from '../components/PageHeader.jsx';
 import HeroCard from '../components/HeroCard.jsx';
 import StatCard from '../components/StatCard.jsx';
 import TodoOverview from '../components/TodoOverview.jsx';
-import FocusCard from '../components/FocusCard.jsx';
 import StudyActivity from '../components/StudyActivity.jsx';
 import StudyChart from '../components/StudyChart.jsx';
 import LearningProgress from '../components/LearningProgress.jsx';
@@ -81,23 +80,6 @@ export default function TodayPage() {
 
   const todos = data?.todos || EMPTY_DATA.todos;
 
-  // Next upcoming calendar session; nothing invented when the day is clear
-  const nextSession = useMemo(() => {
-    const now = Date.now();
-    const upcoming = todos
-      .filter(t => !t.completed && t.dueDate && new Date(t.dueDate).getTime() >= now)
-      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0];
-
-    if (!upcoming) return null;
-    const due = new Date(upcoming.dueDate);
-    const mins = parseInt(upcoming.estimatedDuration, 10);
-    return {
-      time: due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      title: upcoming.title,
-      duration: Number.isFinite(mins) && mins > 0 ? `${mins} min` : ''
-    };
-  }, [todos]);
-
   useEffect(() => {
     const compute = () => setTodayKey(new Date().toISOString().slice(0, 10));
     compute();
@@ -123,14 +105,15 @@ export default function TodayPage() {
   return (
     <div className="stagger">
       <PageHeader
-        eyebrow="One step at a time"
-        title={user?.name ? `Make today count, ${user.name}.` : 'Make today count.'}
-        subtitle="A place for the work you do today and the person you're becoming."
+        eyebrow="Daily Focus"
+        metricTag="LIVE"
+        title={user?.name ? `Welcome back, ${user.name}` : 'Welcome back'}
+        subtitle="Here is your study routine and focus goals for today."
         date={formatDate()}
       />
 
       {loadError && (
-        <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', marginBottom: 'var(--space-4)' }}>
+        <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', borderRadius: '6px', padding: '10px 14px', fontSize: '12px', fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-4)' }}>
           Could not load your dashboard. Is the server running?
         </div>
       )}
@@ -141,41 +124,42 @@ export default function TodayPage() {
       {/* Stats Grid */}
       <div className="stats-grid stagger">
         <StatCard
+          metricCode="01"
+          tag="TIME"
           icon={Clock}
-          iconBg="var(--color-primary-light)"
-          iconColor="var(--color-primary)"
           value={formatStudyTime(stats.studyTime)}
           label="Study time today"
+          targetInfo="Daily target: 4 hours"
         />
         <StatCard
+          metricCode="02"
+          tag="TASKS"
           icon={CheckSquare}
-          iconBg="var(--color-success-light)"
-          iconColor="var(--color-success-text)"
           value={stats.totalTasks > 0 ? `${stats.tasksCompleted} / ${stats.totalTasks}` : '0'}
           label="Tasks completed"
+          targetInfo="Active tasks"
         />
         <StatCard
+          metricCode="03"
+          tag="PROGRESS"
           icon={TrendingUp}
-          iconBg="var(--color-warning-light)"
-          iconColor="var(--color-warning-text)"
           value={hasPaths ? `${stats.overallProgress}%` : '—'}
-          label="Learning progress"
+          label="Course progress"
+          targetInfo="Overall completion"
         />
         <StatCard
+          metricCode="04"
+          tag="STREAK"
           icon={Flame}
-          iconBg="#FEF2F2"
-          iconColor="#EF4444"
           value={`${stats.streak} ${stats.streak === 1 ? 'day' : 'days'}`}
           label="Current streak"
+          targetInfo="Daily study habit"
         />
       </div>
 
-      {/* Main Dashboard Grid */}
-      <div className="dashboard-grid">
-        {/* Left column: Todos */}
+      {/* Main Dashboard Todos */}
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <TodoOverview key={todayKey} todos={d.todos} />
-        {/* Right column: Focus */}
-        <FocusCard key={todayKey} learningPath={currentPath} nextSession={nextSession} />
       </div>
 
       <div className="dashboard-grid">

@@ -88,77 +88,97 @@ export default function GoalsOverview({ goals: initialGoals }) {
   return (
     <div className="card fade-in">
       <div className="card-header">
-        <h3 className="card-title">Today's goals</h3>
-        <span className="card-link" onClick={() => { setShowForm(prev => !prev); setError(''); }}>
-          {showForm ? <X size={14} /> : <Plus size={14} />}
-          {showForm ? 'Close' : 'Add goal'}
-        </span>
+        <div className="card-header-eyebrow-group">
+          <span className="card-header-red-dot">■</span>
+          <h3 className="card-title">MISSION OBJECTIVES // TARGET LEDGER</h3>
+        </div>
+        <button
+          type="button"
+          className="card-link-btn"
+          onClick={() => { setShowForm(prev => !prev); setError(''); }}
+        >
+          {showForm ? <X size={13} /> : <Plus size={13} />}
+          <span>{showForm ? 'Cancel' : '+ New Target'}</span>
+        </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleAdd} style={{ display: 'flex', gap: '8px', padding: '0 var(--space-4) var(--space-3)', flexWrap: 'wrap' }}>
+        <form onSubmit={handleAdd} className="goal-create-form">
           <input
             type="text"
             className="form-input"
-            style={{ flex: 1, minWidth: '160px' }}
-            placeholder="What do you want to finish?"
+            placeholder="Objective specification..."
             value={title}
             onChange={e => setTitle(e.target.value)}
             autoFocus
           />
-          <select className="form-input" style={{ width: '110px' }} value={type} onChange={e => setType(e.target.value)}>
+          <select
+            className="form-input form-select"
+            value={type}
+            onChange={e => setType(e.target.value)}
+          >
             {Object.entries(TYPE_LABELS).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
           <button type="submit" className="btn btn-primary" disabled={saving || !title.trim()}>
-            {saving ? 'Adding...' : 'Add'}
+            {saving ? 'Registering...' : 'REGISTER'}
           </button>
           {error && (
-            <div style={{ width: '100%', color: '#ef4444', fontSize: '12px' }}>{error}</div>
+            <div className="form-error-msg">{error}</div>
           )}
         </form>
       )}
 
       <div className="goals-list">
         {ordered.length === 0 && !showForm && (
-          <p style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-sm)', padding: 'var(--space-4) 0' }}>
-            No goals yet. Add one to start tracking your day.
-          </p>
+          <div className="todo-empty-state">
+            <span className="todo-empty-icon">■</span>
+            <span>No objective targets logged. Click + New Target to add.</span>
+          </div>
         )}
         {ordered.map((goal) => {
           const i = goals.indexOf(goal);
           return (
             <div
-              key={goal._id}
+              key={goal._id || goal.title}
               className={`goal-item ${goal.completed ? 'completed' : ''}`}
             >
-              <div
+              <button
+                type="button"
                 className={`goal-check ${goal.completed ? 'completed' : ''}`}
                 onClick={() => toggleGoal(i)}
+                aria-label={goal.completed ? "Mark objective incomplete" : "Mark objective complete"}
               >
                 {goal.completed && <Check size={12} />}
-              </div>
+              </button>
+
               <span className="goal-title">{goal.title}</span>
+
               {goal.type && (
-                <span className="todo-duration" style={{ flexShrink: 0 }}>
+                <span className="goal-type-badge">
                   {TYPE_LABELS[goal.type] || goal.type}
                 </span>
               )}
-              <Trash2
-                size={13}
-                className="todo-arrow"
-                style={{ cursor: 'pointer' }}
+
+              <button
+                type="button"
+                className="goal-delete-btn"
                 title="Delete goal"
                 onClick={() => handleDelete(i)}
-              />
+                aria-label="Delete objective"
+              >
+                <Trash2 size={13} />
+              </button>
             </div>
           );
         })}
       </div>
+
       {goals.length > 0 && (
-        <div className="goals-summary">
-          {completedCount} / {goals.length} goals completed
+        <div className="goals-summary-bar">
+          <span className="goals-summary-count">{completedCount} of {goals.length} objectives accomplished</span>
+          <span className="goals-summary-pct">{Math.round((completedCount / goals.length) * 100)}%</span>
         </div>
       )}
     </div>

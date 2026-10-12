@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import {
   FolderOpen, Plus, Search, Filter, Star, Link, Video, FileText,
   BookOpen, GitBranch, Code, ExternalLink, Bookmark, Tag, Grid, List,
-  FolderPlus, Trash2, Edit, ChevronRight, Layers, Sparkles, Check
+  FolderPlus, Trash2, Edit, ChevronRight, Layers, Sparkles, Check,
+  RefreshCw, HardDrive, CheckCircle2, X
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader.jsx';
+import StatCard from '../components/StatCard.jsx';
 import {
   getResources, getResourceFolders, createResource, updateResource,
   deleteResource, markResourceOpen, createResourceFolder, getLearningPaths
 } from '../services/api';
+import '../index.css';
 
 export default function ResourcesPage() {
   const [resources, setResources] = useState([]);
@@ -164,24 +168,24 @@ export default function ResourcesPage() {
   // Delete Resource
   const handleDeleteResource = async (id, e) => {
     e?.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this resource?')) return;
+    if (!window.confirm('Delete this resource artifact permanently?')) return;
     try {
       await deleteResource(id);
+      setResources(prev => prev.filter(r => r._id !== id));
       if (selectedResourceDetail?._id === id) setSelectedResourceDetail(null);
-      fetchAll();
     } catch (err) {
       console.error('Delete resource error:', err);
     }
   };
 
-  // Save Personal Notes in Detail Drawer
+  // Save Notes inside Drawer
   const handleSaveNotes = async () => {
     if (!selectedResourceDetail) return;
     setSavingNotes(true);
     try {
       await updateResource(selectedResourceDetail._id, { notes: drawerNotes });
-      setSelectedResourceDetail({ ...selectedResourceDetail, notes: drawerNotes });
-      fetchAll();
+      setSelectedResourceDetail(prev => ({ ...prev, notes: drawerNotes }));
+      setResources(prev => prev.map(r => r._id === selectedResourceDetail._id ? { ...r, notes: drawerNotes } : r));
     } catch (err) {
       console.error('Save notes error:', err);
     } finally {
@@ -189,389 +193,344 @@ export default function ResourcesPage() {
     }
   };
 
-  // Type Icon Helper
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case 'video': return <Video size={16} className="type-icon video" />;
-      case 'github': return <GitBranch size={16} className="type-icon github" />;
-      case 'documentation': return <Code size={16} className="type-icon docs" />;
-      case 'article': return <FileText size={16} className="type-icon article" />;
-      case 'book': return <BookOpen size={16} className="type-icon book" />;
-      case 'note': return <Bookmark size={16} className="type-icon note" />;
-      default: return <Link size={16} className="type-icon link" />;
-    }
-  };
-
-  // Filtered Pinned Resources
-  const pinnedResources = resources.filter(r => r.isPinned || r.isFavorite);
-
-  // Totals for Dashboard
+  // Totals
   const totalResourcesCount = resources.length;
   const bookmarksCount = resources.filter(r => r.type === 'link' || r.type === 'video' || r.type === 'article').length;
   const notesCount = resources.filter(r => r.type === 'note' || r.notes).length;
   const starredCount = resources.filter(r => r.isFavorite || r.isPinned).length;
 
   return (
-    <div className="resources-page">
-      {/* Page Header */}
-      <div className="resources-header">
-        <div>
-          <div className="page-header-eyebrow">PERSONAL OS / KNOWLEDGE VAULT</div>
-          <h1 className="page-header-title">Resources</h1>
-          <p className="page-header-subtitle">
-            Everything you need, curated and structured your way.
-          </p>
+    <div className="page-container" style={{ paddingBottom: '60px' }}>
+      <PageHeader 
+        marker="■ ARCHIVAL BANK // REV 4 // SYNCHRONIZED WITH REPO"
+        title="Knowledge Vault & Artifacts"
+        subtitle="Curated research papers, canonical documentation, distributed systems schematics, and production-tested algorithms indexed for rapid cognitive retrieval."
+        actions={
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button 
+              className="btn btn-secondary" 
+              style={{ fontSize: '11px', padding: '6px 14px', fontFamily: 'var(--font-mono)' }}
+              onClick={fetchAll}
+            >
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> PULL & FILTER
+            </button>
+            <button 
+              className="btn btn-primary" 
+              style={{ fontSize: '11px', padding: '6px 16px' }}
+              onClick={() => setShowAddResourceModal(true)}
+            >
+              <Plus size={14} /> ADD RESOURCE
+            </button>
+          </div>
+        }
+      />
+
+      {/* 4 Telemetry Cards Row matching Screenshot 4 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <StatCard
+          metricCode="ARCHIVE // 01"
+          title="Indexed Nodes"
+          value={`${totalResourcesCount} Indexed`}
+          tag="TOTAL NODES"
+          targetInfo={`Across ${folders.length || 5} directories`}
+        />
+        <StatCard
+          metricCode="SYNC // 02"
+          title="Live & Synced"
+          value={`${bookmarksCount} Bookmarks`}
+          tag="CLOUD VERIFIED"
+          tagColor="var(--color-text-secondary)"
+          targetInfo="Canonical sources alive"
+        />
+        <StatCard
+          metricCode="SYNTHESIS // 03"
+          title="Revision Sets"
+          value={`${notesCount} Notes`}
+          tag="DOCUMENTED"
+          targetInfo="Active notes & docs"
+        />
+        <StatCard
+          metricCode="PRIORITY // 04"
+          title="High-Yield Sets"
+          value={`${starredCount} Starred`}
+          tag="FAVORITES"
+          tagColor="var(--color-accent)"
+          targetInfo="Fast cognitive recall"
+        />
+      </div>
+
+      {/* Search and Category Filters Bar */}
+      <div className="mx-card" style={{ padding: '12px 18px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '280px' }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
+            <input 
+              type="text"
+              placeholder="Search [⌘K] papers, nodes, concepts..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="form-input"
+              style={{ paddingLeft: '32px', paddingRight: '12px', height: '34px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+            />
+          </div>
         </div>
 
-        <div className="resources-header-actions">
-          <button className="btn btn-secondary" onClick={() => setShowAddFolderModal(true)}>
-            <FolderPlus size={16} />
-            <span>New Folder</span>
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowAddResourceModal(true)}>
-            <Plus size={16} />
-            <span>New Resource</span>
-          </button>
+        {/* Category Filter Pills */}
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {[
+            { id: 'all', label: `ALL (${resources.length})` },
+            { id: 'link', label: 'PAPERS & PDF' },
+            { id: 'article', label: 'WHITE PAPERS' },
+            { id: 'documentation', label: 'OFFICIAL DOCS' },
+            { id: 'video', label: 'LECTURES' },
+            { id: 'note', label: 'CODEBASE' }
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setSelectedType(t.id)}
+              style={{
+                padding: '4px 10px',
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.04em',
+                borderRadius: '3px',
+                border: selectedType === t.id ? '1px solid var(--color-text-primary)' : '1px solid var(--color-border)',
+                background: selectedType === t.id ? 'var(--color-text-primary)' : 'transparent',
+                color: selectedType === t.id ? '#FFFFFF' : 'var(--color-text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Top 4 Dashboard Cards (Matching Screenshot!) */}
-      <div className="resources-dash-grid">
-        <div className="res-dash-card">
-          <div className="res-dash-header">
-            <span className="res-dash-title">TOTAL RESOURCES</span>
-            <FolderOpen size={16} className="res-dash-icon" />
-          </div>
-          <div className="res-dash-val">{totalResourcesCount} <span className="sub">Saved</span></div>
-          <span className="res-dash-footer">Across {folders.length} directories</span>
-        </div>
-
-        <div className="res-dash-card">
-          <div className="res-dash-header">
-            <span className="res-dash-title">BOOKMARKS & URLS</span>
-            <Link size={16} className="res-dash-icon" />
-          </div>
-          <div className="res-dash-val">{bookmarksCount} <span className="sub">User Links</span></div>
-          <span className="res-dash-footer">● All healthy</span>
-        </div>
-
-        <div className="res-dash-card">
-          <div className="res-dash-header">
-            <span className="res-dash-title">RICH NOTES & DOCS</span>
-            <FileText size={16} className="res-dash-icon" />
-          </div>
-          <div className="res-dash-val">{notesCount} <span className="sub">Written Topics</span></div>
-          <span className="res-dash-footer">3 created this week</span>
-        </div>
-
-        <div className="res-dash-card">
-          <div className="res-dash-header">
-            <span className="res-dash-title">STARRED HIGHLIGHTS</span>
-            <Star size={16} className="res-dash-icon starred" />
-          </div>
-          <div className="res-dash-val">{starredCount} <span className="sub">Pinned</span></div>
-          <span className="res-dash-footer">Quick access enabled</span>
-        </div>
-      </div>
-
-      {/* Main Layout: Sidebar Directories + Resource Canvas */}
-      <div className="resources-main-layout">
-        {/* Left Directories & Type Filters Sidebar */}
-        <div className="resources-sidebar">
-          {/* Folders List */}
-          <div className="sidebar-section">
-            <div className="sidebar-section-header">
-              <span>DIRECTORIES</span>
-              <button className="icon-btn-sm" onClick={() => setShowAddFolderModal(true)} title="Add Folder">
-                <Plus size={14} />
+      {/* Main Dual-Pane Vault Layout matching Screenshot 4 */}
+      <div className="vault-layout-container">
+        
+        {/* Left Directory & Tag Tree Sidebar */}
+        <div className="vault-sidebar-pane">
+          <div className="vault-tree-card">
+            
+            {/* Directories Section */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '0.02em' }}>
+                Folders & Folders
+              </span>
+              <button 
+                onClick={() => setShowAddFolderModal(true)}
+                className="btn btn-secondary btn-sm"
+                style={{ padding: '3px 8px', fontSize: '11px' }}
+                title="Add Directory"
+              >
+                <Plus size={12} /> New Folder
               </button>
             </div>
 
-            <div className="folder-tree-list">
-              <div
-                className={`folder-item ${selectedFolderId === 'all' ? 'active' : ''}`}
-                onClick={() => setSelectedFolderId('all')}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
+              <div 
+                className={`vault-folder-item ${selectedFolderId === 'all' && !showOnlyFavorites ? 'active' : ''}`}
+                onClick={() => { setSelectedFolderId('all'); setShowOnlyFavorites(false); }}
               >
                 <FolderOpen size={14} />
-                <span className="folder-name">All Resources</span>
-                <span className="folder-count">{resources.length}</span>
+                <span className="folder-label">All Resources</span>
+                <span className="folder-badge">{resources.length}</span>
               </div>
 
-              <div
-                className={`folder-item ${showOnlyFavorites ? 'active' : ''}`}
-                onClick={() => { setShowOnlyFavorites(!showOnlyFavorites); setSelectedFolderId('all'); }}
+              <div 
+                className={`vault-folder-item ${showOnlyFavorites ? 'active' : ''}`}
+                onClick={() => { setShowOnlyFavorites(true); setSelectedFolderId('all'); }}
               >
-                <Star size={14} className="star-icon" />
-                <span className="folder-name">Starred & Favorites</span>
-                <span className="folder-count">{starredCount}</span>
+                <Star size={14} style={{ color: 'var(--color-accent)' }} />
+                <span className="folder-label">Favorites & Starred</span>
+                <span className="folder-badge">{starredCount}</span>
               </div>
 
               {folders.map(f => (
-                <div
+                <div 
                   key={f._id}
-                  className={`folder-item ${selectedFolderId === f._id ? 'active' : ''}`}
+                  className={`vault-folder-item ${selectedFolderId === f._id ? 'active' : ''}`}
                   onClick={() => { setSelectedFolderId(f._id); setShowOnlyFavorites(false); }}
                 >
-                  <FolderOpen size={14} style={{ color: f.color }} />
-                  <span className="folder-name">{f.name}</span>
-                  <span className="folder-count">{f.resourceCount || 0}</span>
+                  <FolderOpen size={14} />
+                  <span className="folder-label">{f.name}</span>
+                  <span className="folder-badge">{f.resourceCount || 0}</span>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Resource Types List */}
-          <div className="sidebar-section">
-            <div className="sidebar-section-header">
-              <span>RESOURCE TYPE</span>
+            {/* Storage Quota */}
+            <div style={{ paddingTop: '16px', borderTop: '1px solid var(--color-border)', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-text-tertiary)', marginBottom: '4px' }}>
+                <span>STORAGE ALLOCATION</span>
+                <span>56.8% USED</span>
+              </div>
+              <div style={{ width: '100%', height: '4px', background: 'var(--color-border)', borderRadius: '1px', overflow: 'hidden', marginBottom: '6px' }}>
+                <div style={{ width: '56.8%', height: '100%', background: 'var(--color-text-primary)' }}></div>
+              </div>
+              <div style={{ color: 'var(--color-text-secondary)' }}>
+                14.2 GB / 25.0 GB Cloud Sync
+              </div>
             </div>
 
-            <div className="type-filter-list">
-              {[
-                { id: 'all', label: 'All Types' },
-                { id: 'link', label: 'Links' },
-                { id: 'video', label: 'Videos' },
-                { id: 'article', label: 'Articles' },
-                { id: 'documentation', label: 'Docs' },
-                { id: 'github', label: 'GitHub' },
-                { id: 'note', label: 'Notes' },
-                { id: 'file', label: 'Files' }
-              ].map(t => (
-                <button
-                  key={t.id}
-                  className={`type-pill ${selectedType === t.id ? 'active' : ''}`}
-                  onClick={() => setSelectedType(t.id)}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Curriculum Binding Info Box */}
-          <div className="curriculum-binding-box">
-            <div className="binding-header">
-              <Layers size={14} />
-              <span>Curriculum Binding</span>
-            </div>
-            <p>Attach resources to your learning paths and daily study focus.</p>
-            <div className="progress-bar mini">
-              <div className="progress-fill" style={{ width: '72%' }} />
-            </div>
           </div>
         </div>
 
-        {/* Right Canvas: Search Bar + Pinned Access + Resources List */}
-        <div className="resources-canvas">
-          {/* Top Search & Display Controls Bar */}
-          <div className="canvas-controls-bar">
-            <div className="search-input-wrapper">
-              <Search size={16} className="search-icon" />
-              <input
-                type="text"
-                placeholder="Search resources by title, notes, papers..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
+        {/* Right Artifacts Grid */}
+        <div className="vault-canvas-pane">
+          {loading ? (
+            <div className="vault-cards-grid">
+              {[1, 2, 3, 4, 5, 6].map(n => (
+                <div key={n} className="skeleton-box" style={{ height: '220px', borderRadius: '2px' }} />
+              ))}
             </div>
-
-            <div className="view-mode-toggle">
-              <button
-                className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid size={16} />
-              </button>
-              <button
-                className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
-                onClick={() => setViewMode('list')}
-              >
-                <List size={16} />
+          ) : resources.length === 0 ? (
+            <div className="mx-card" style={{ padding: '60px 20px', textAlign: 'center' }}>
+              <HardDrive size={36} color="var(--color-text-tertiary)" style={{ margin: '0 auto 12px auto' }} />
+              <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}>No Archival Artifacts Found</h3>
+              <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', maxWidth: '420px', margin: '4px auto 16px auto' }}>
+                Index research papers, technical monographs, API specs, and deep work cheatsheets.
+              </p>
+              <button className="btn btn-primary" style={{ fontSize: '12px' }} onClick={() => setShowAddResourceModal(true)}>
+                <Plus size={14} /> Add First Resource
               </button>
             </div>
-          </div>
-
-          {/* Pinned & Frequent Access Section */}
-          {pinnedResources.length > 0 && selectedFolderId === 'all' && !searchQuery && (
-            <div className="pinned-resources-section">
-              <div className="section-title-row">
-                <span className="section-title">⭐ Pinned & Frequent Access</span>
-                <span className="section-subtitle">{pinnedResources.length} highlights</span>
-              </div>
-
-              <div className="pinned-grid">
-                {pinnedResources.slice(0, 3).map(r => (
-                  <div
-                    key={r._id}
-                    className="pinned-card"
+          ) : (
+            <div className="vault-cards-grid">
+              {resources.map((r, idx) => {
+                const domainLabel = r.type === 'note' ? 'INTERNAL NOTE' : (r.domain || r.type || 'RESEARCH SPEC').toUpperCase();
+                return (
+                  <div 
+                    key={r._id} 
+                    className="vault-artifact-card"
                     onClick={() => { setSelectedResourceDetail(r); setDrawerNotes(r.notes || ''); }}
                   >
-                    <div className="pinned-card-header">
-                      <div className="pinned-type">
-                        {getTypeIcon(r.type)}
-                        <span>{r.domain || r.type}</span>
+                    <div className="artifact-top-meta">
+                      <span className="artifact-eyebrow">
+                        ■ {domainLabel}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
+                          REV {idx + 1}
+                        </span>
+                        <button 
+                          onClick={(e) => handleToggleFavorite(r, e)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: r.isFavorite ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+                          title="Bookmark / Star"
+                        >
+                          <Star size={13} fill={r.isFavorite ? 'var(--color-accent)' : 'none'} />
+                        </button>
                       </div>
-                      <Star
-                        size={14}
-                        className={`star-btn ${r.isFavorite ? 'active' : ''}`}
-                        onClick={e => handleToggleFavorite(r, e)}
-                      />
                     </div>
-                    <h4 className="pinned-title">{r.title}</h4>
-                    <p className="pinned-desc">{r.description || 'Quick reference material.'}</p>
-                    <div className="pinned-tags">
-                      {r.tags?.map((t, idx) => (
-                        <span key={idx} className="tag">#{t}</span>
-                      ))}
+
+                    <h4 className="artifact-title">
+                      {r.title}
+                    </h4>
+
+                    <p className="artifact-desc">
+                      {r.description || 'Deep technical specification indexed for rapid cognitive retrieval in high-focus mode.'}
+                    </p>
+
+                    {/* Tag or Code Spec Snippet */}
+                    <div className="artifact-tag-box">
+                      <span className="artifact-tag-pill">
+                        {r.tags?.[0] ? `INDEX // ${r.tags[0].toUpperCase()}` : 'TXID_CANONICAL == TRUE'}
+                      </span>
+                    </div>
+
+                    <div className="artifact-footer">
+                      <div style={{ display: 'flex', gap: '8px', fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
+                        <span>{r.notes ? 'HAS NOTES' : 'VERIFIED'}</span>
+                        <span>·</span>
+                        <span>{r.type.toUpperCase()}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {r.url && (
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '3px 8px', fontSize: '10px' }}
+                            onClick={(e) => handleOpenResource(r, e)}
+                            title="Open external source"
+                          >
+                            <ExternalLink size={11} /> Open
+                          </button>
+                        )}
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '3px 6px', fontSize: '10px', color: 'var(--color-accent)' }}
+                          onClick={(e) => handleDeleteResource(r._id, e)}
+                          title="Delete artifact"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
-
-          {/* Main Resources List */}
-          <div className="resources-list-section">
-            <div className="section-title-row">
-              <span className="section-title">Resource Library</span>
-              <span className="section-subtitle">Showing {resources.length} items</span>
-            </div>
-
-            {loading ? (
-              <div className="resources-grid">
-                {[1, 2, 3, 4].map(n => (
-                  <div key={n} className="skeleton-box" style={{ height: '160px', borderRadius: 'var(--radius-lg)' }} />
-                ))}
-              </div>
-            ) : resources.length > 0 ? (
-              <div className={`resources-${viewMode}-layout`}>
-                {resources.map(r => (
-                  <div
-                    key={r._id}
-                    className="resource-item-card"
-                    onClick={() => { setSelectedResourceDetail(r); setDrawerNotes(r.notes || ''); }}
-                  >
-                    <div className="res-card-top">
-                      <div className="res-type-badge">
-                        {getTypeIcon(r.type)}
-                        <span>{r.domain || r.type}</span>
-                      </div>
-                      <div className="res-card-actions">
-                        <Star
-                          size={16}
-                          className={`star-btn ${r.isFavorite ? 'active' : ''}`}
-                          onClick={e => handleToggleFavorite(r, e)}
-                        />
-                        <Trash2
-                          size={14}
-                          className="delete-btn"
-                          onClick={e => handleDeleteResource(r._id, e)}
-                        />
-                      </div>
-                    </div>
-
-                    <h3 className="res-card-title">{r.title}</h3>
-                    <p className="res-card-desc">{r.description || 'Saved resource item.'}</p>
-
-                    {r.tags?.length > 0 && (
-                      <div className="res-card-tags">
-                        {r.tags.map((t, idx) => (
-                          <span key={idx} className="tag">#{t}</span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="res-card-footer">
-                      {r.learningPathId && (
-                        <span className="linked-path-badge">
-                          Linked to {r.learningPathId.title || 'Learning'}
-                        </span>
-                      )}
-                      {r.url && (
-                        <button
-                          className="btn btn-secondary btn-sm open-url-btn"
-                          onClick={e => handleOpenResource(r, e)}
-                        >
-                          <span>Open</span>
-                          <ExternalLink size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-chart-box">
-                <Bookmark size={36} />
-                <p>Build your resource library by saving courses, articles, videos, and notes.</p>
-                <button className="btn btn-primary btn-sm" onClick={() => setShowAddResourceModal(true)}>
-                  <Plus size={16} /> Add Resource
-                </button>
-              </div>
-            )}
-          </div>
         </div>
+
       </div>
 
-      {/* Selected Resource Detail Drawer / Reader */}
+      {/* Resource Detail Drawer */}
       {selectedResourceDetail && (
-        <div className="modal-backdrop" onClick={() => setSelectedResourceDetail(null)}>
-          <div className="topic-drawer" onClick={e => e.stopPropagation()}>
-            <div className="drawer-header">
-              <div className="drawer-title-group">
-                <div className="res-type-badge">
-                  {getTypeIcon(selectedResourceDetail.type)}
-                  <span>{selectedResourceDetail.type}</span>
-                </div>
-                <h2>{selectedResourceDetail.title}</h2>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', justifyContent: 'flex-end', zIndex: 1100, backdropFilter: 'blur(2px)' }} onClick={() => setSelectedResourceDetail(null)}>
+          <div style={{ width: '480px', height: '100%', background: '#FFFFFF', borderLeft: '1px solid var(--color-border)', padding: '28px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', letterSpacing: '0.08em' }}>
+                  ■ ARTIFACT INSPECTOR // {selectedResourceDetail.type.toUpperCase()}
+                </span>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, margin: '4px 0 0 0', color: 'var(--color-text-primary)' }}>
+                  {selectedResourceDetail.title}
+                </h3>
               </div>
-              <button className="modal-close-btn" onClick={() => setSelectedResourceDetail(null)}>×</button>
+              <button onClick={() => setSelectedResourceDetail(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)' }}>
+                <X size={18} />
+              </button>
             </div>
 
-            <div className="drawer-body">
-              {selectedResourceDetail.url && (
-                <div className="resource-url-box">
-                  <span>Source URL:</span>
-                  <a href={selectedResourceDetail.url} target="_blank" rel="noreferrer">
-                    {selectedResourceDetail.url} <ExternalLink size={12} />
-                  </a>
-                </div>
-              )}
+            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: 1.5, marginBottom: '20px' }}>
+              {selectedResourceDetail.description || 'No description provided.'}
+            </p>
 
-              {selectedResourceDetail.description && (
-                <div className="drawer-desc">
-                  <p>{selectedResourceDetail.description}</p>
-                </div>
-              )}
-
-              {/* Linked Curriculum Context */}
-              {selectedResourceDetail.learningPathId && (
-                <div className="linked-topic-box">
-                  <Layers size={14} />
-                  <span>Linked to: {selectedResourceDetail.learningPathId.title} {selectedResourceDetail.topicId?.title ? `→ ${selectedResourceDetail.topicId.title}` : ''}</span>
-                </div>
-              )}
-
-              {/* Personal Notes Field */}
-              <div className="topic-notes-section">
-                <div className="notes-header">
-                  <FileText size={16} />
-                  <span>Personal Resource Notes</span>
-                </div>
-                <textarea
-                  rows="6"
-                  placeholder="Add your personal notes or timestamps for this resource..."
-                  value={drawerNotes}
-                  onChange={e => setDrawerNotes(e.target.value)}
-                />
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={handleSaveNotes}
-                  disabled={savingNotes}
+            {selectedResourceDetail.url && (
+              <div style={{ marginBottom: '20px' }}>
+                <a 
+                  href={selectedResourceDetail.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="btn btn-secondary" 
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
                 >
-                  {savingNotes ? 'Saving...' : 'Save Notes'}
-                </button>
+                  <ExternalLink size={13} /> Open Canonical Link
+                </a>
               </div>
+            )}
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <label style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                SYNTHESIS & RETRIEVAL NOTES
+              </label>
+              <textarea 
+                className="form-input" 
+                style={{ flex: 1, minHeight: '220px', fontFamily: 'var(--font-mono)', fontSize: '12px', lineHeight: 1.6, resize: 'vertical' }}
+                value={drawerNotes}
+                onChange={e => setDrawerNotes(e.target.value)}
+                placeholder="Write markdown notes, code snippets, or key takeaways from this artifact..."
+              />
+              <button 
+                className="btn btn-primary" 
+                style={{ alignSelf: 'flex-end', fontSize: '12px', padding: '7px 18px' }}
+                onClick={handleSaveNotes}
+                disabled={savingNotes}
+              >
+                {savingNotes ? 'Saving...' : 'Save Notes'}
+              </button>
             </div>
           </div>
         </div>
@@ -579,49 +538,73 @@ export default function ResourcesPage() {
 
       {/* Add Resource Modal */}
       {showAddResourceModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddResourceModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add New Resource</h2>
-              <button className="modal-close-btn" onClick={() => setShowAddResourceModal(false)}>×</button>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)' }}>
+          <div className="mx-card" style={{ width: '450px', padding: '24px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', letterSpacing: '0.08em' }}>
+                  ■ NEW ARTIFACT REGISTRATION
+                </span>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '2px 0 0 0', color: 'var(--color-text-primary)' }}>
+                  Register Resource Artifact
+                </h3>
+              </div>
+              <button onClick={() => setShowAddResourceModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
             </div>
-            <form onSubmit={handleCreateResource} className="modal-form">
-              <div className="form-group">
-                <label>Title *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Dynamic Programming Patterns"
-                  value={resForm.title}
-                  onChange={e => setResForm({ ...resForm, title: e.target.value })}
+
+            <form onSubmit={handleCreateResource} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>TITLE</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  required 
+                  value={resForm.title} 
+                  onChange={e => setResForm({...resForm, title: e.target.value})} 
+                  placeholder="e.g. Designing Data-Intensive Applications" 
+                  style={{ fontSize: '13px' }}
                 />
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Type</label>
-                  <select
-                    value={resForm.type}
-                    onChange={e => setResForm({ ...resForm, type: e.target.value })}
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>CANONICAL URL</label>
+                <input 
+                  type="url" 
+                  className="form-input" 
+                  value={resForm.url} 
+                  onChange={e => setResForm({...resForm, url: e.target.value})} 
+                  placeholder="https://..." 
+                  style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>TYPE</label>
+                  <select 
+                    className="form-input" 
+                    value={resForm.type} 
+                    onChange={e => setResForm({...resForm, type: e.target.value})}
+                    style={{ fontSize: '12px' }}
                   >
-                    <option value="link">Link</option>
-                    <option value="video">Video</option>
-                    <option value="article">Article</option>
-                    <option value="documentation">Documentation</option>
-                    <option value="github">GitHub</option>
-                    <option value="book">Book</option>
-                    <option value="note">Personal Note</option>
-                    <option value="file">File</option>
+                    <option value="link">Link / Paper</option>
+                    <option value="article">Article / Spec</option>
+                    <option value="documentation">Official Docs</option>
+                    <option value="video">Lecture / Media</option>
+                    <option value="note">Internal Note</option>
                   </select>
                 </div>
-
-                <div className="form-group">
-                  <label>Folder</label>
-                  <select
-                    value={resForm.folderId}
-                    onChange={e => setResForm({ ...resForm, folderId: e.target.value })}
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>DIRECTORY</label>
+                  <select 
+                    className="form-input" 
+                    value={resForm.folderId} 
+                    onChange={e => setResForm({...resForm, folderId: e.target.value})}
+                    style={{ fontSize: '12px' }}
                   >
-                    <option value="">Unorganized</option>
+                    <option value="">Root Vault</option>
                     {folders.map(f => (
                       <option key={f._id} value={f._id}>{f.name}</option>
                     ))}
@@ -629,53 +612,22 @@ export default function ResourcesPage() {
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>URL (Optional)</label>
-                <input
-                  type="url"
-                  placeholder="https://youtube.com/..."
-                  value={resForm.url}
-                  onChange={e => setResForm({ ...resForm, url: e.target.value })}
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>ABSTRACT / DESCRIPTION</label>
+                <textarea 
+                  className="form-input" 
+                  rows={2} 
+                  value={resForm.description} 
+                  onChange={e => setResForm({...resForm, description: e.target.value})} 
+                  placeholder="Brief synopsis for quick retrieval..."
+                  style={{ fontSize: '12px' }}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Learning Path (Optional)</label>
-                <select
-                  value={resForm.learningPathId}
-                  onChange={e => setResForm({ ...resForm, learningPathId: e.target.value })}
-                >
-                  <option value="">None</option>
-                  {learningPaths.map(lp => (
-                    <option key={lp._id} value={lp._id}>{lp.title}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Tags (Comma separated)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. DSA, DP, Interview"
-                  value={resForm.tags}
-                  onChange={e => setResForm({ ...resForm, tags: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Description</label>
-                <textarea
-                  rows="2"
-                  placeholder="Brief summary of resource content..."
-                  value={resForm.description}
-                  onChange={e => setResForm({ ...resForm, description: e.target.value })}
-                />
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowAddResourceModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={creatingRes}>
-                  {creatingRes ? 'Saving...' : 'Add Resource'}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAddResourceModal(false)} style={{ fontSize: '12px' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={creatingRes} style={{ fontSize: '12px' }}>
+                  {creatingRes ? 'Registering...' : 'Register Artifact'}
                 </button>
               </div>
             </form>
@@ -685,27 +637,34 @@ export default function ResourcesPage() {
 
       {/* Add Folder Modal */}
       {showAddFolderModal && (
-        <div className="modal-backdrop" onClick={() => setShowAddFolderModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>New Folder</h2>
-              <button className="modal-close-btn" onClick={() => setShowAddFolderModal(false)}>×</button>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)' }}>
+          <div className="mx-card" style={{ width: '380px', padding: '24px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>■ NEW DIRECTORY</span>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '2px 0 0 0' }}>Create Folder</h3>
+              </div>
+              <button onClick={() => setShowAddFolderModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={16} />
+              </button>
             </div>
-            <form onSubmit={handleCreateFolder} className="modal-form">
-              <div className="form-group">
-                <label>Folder Name *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. DSA / Dynamic Programming"
-                  value={folderName}
-                  onChange={e => setFolderName(e.target.value)}
+
+            <form onSubmit={handleCreateFolder} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>DIRECTORY NAME</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  required 
+                  value={folderName} 
+                  onChange={e => setFolderName(e.target.value)} 
+                  placeholder="e.g. Distributed Systems" 
                 />
               </div>
 
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowAddFolderModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={creatingFolder}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAddFolderModal(false)} style={{ fontSize: '12px' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={creatingFolder} style={{ fontSize: '12px' }}>
                   {creatingFolder ? 'Creating...' : 'Create Folder'}
                 </button>
               </div>
@@ -713,6 +672,7 @@ export default function ResourcesPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

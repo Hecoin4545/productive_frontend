@@ -4,11 +4,13 @@ import {
   BookOpen, Plus, Search, Filter, ArrowUpDown, Clock, CheckCircle,
   Target, Layers, Calendar, ChevronRight, X, Sparkles, Route, Trophy
 } from 'lucide-react';
+import PageHeader from '../components/PageHeader.jsx';
 import { getLearningPaths, createLearningPath, getProfile } from '../services/api';
+import '../index.css';
 
-const PALETTE = ['#6C63FF', '#22C55E', '#F59E0B', '#8B5CF6', '#06B6D4', '#EF4444', '#EC4899', '#14B8A6'];
+const PALETTE = ['#141413', '#E03E2D', '#2B7A78', '#5C5B56', '#D97706'];
 const getSubjectColor = (name) => {
-  if (!name) return '#6C63FF';
+  if (!name) return '#141413';
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return PALETTE[Math.abs(hash) % PALETTE.length];
@@ -24,7 +26,7 @@ export default function LearningPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
-  const [sortBy, setSortBy] = useState('updated'); // updated, title, progress
+  const [sortBy, setSortBy] = useState('updated');
 
   // Create Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -35,7 +37,7 @@ export default function LearningPage() {
     subject: '',
     difficulty: 'Intermediate',
     targetDate: '',
-    color: '#6C63FF'
+    color: '#141413'
   });
   const [creating, setCreating] = useState(false);
 
@@ -83,7 +85,7 @@ export default function LearningPage() {
           subject: 'DSA',
           difficulty: 'Intermediate',
           targetDate: '',
-          color: '#6C63FF'
+          color: '#141413'
         });
         navigate(`/learning/${res.data.data._id}`);
       }
@@ -107,61 +109,62 @@ export default function LearningPage() {
   });
 
   return (
-    <div className="learning-page">
-      {/* Header */}
-      <div className="learning-header">
-        <div>
-          <div className="page-header-eyebrow">WORKSPACE → LEARNING MANAGEMENT</div>
-          <h1 className="page-header-title">My Learning</h1>
-          <p className="page-header-subtitle">
-            Plan what you want to learn and track your progress over time.
-          </p>
-        </div>
-
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowCreateModal(true)}
-        >
-          <Plus size={16} />
-          <span>New Learning Path</span>
-        </button>
-      </div>
+    <div className="page-container" style={{ paddingBottom: '60px' }}>
+      <PageHeader 
+        marker="■ TECHNICAL JOURNALS & BLOG ARCHIVE"
+        title="Learning Tracks & Technical Blogs"
+        subtitle="Write and maintain in-depth blogs, study journals, and engineering notes organized by track."
+        actions={
+          <button
+            className="btn btn-primary"
+            style={{ fontSize: '11px', padding: '7px 16px' }}
+            onClick={() => setShowCreateModal(true)}
+          >
+            <Plus size={14} /> NEW TRACK
+          </button>
+        }
+      />
 
       {/* Search & Filter Bar */}
-      <div className="learning-filter-bar">
-        <div className="search-input-wrapper">
-          <Search size={16} className="search-icon" />
+      <div className="mx-card" style={{ padding: '12px 18px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ position: 'relative', flex: 1, maxWidth: '380px' }}>
+          <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-tertiary)' }} />
           <input
             type="text"
-            placeholder="Search learning paths..."
+            placeholder="Search tracks, specs, algorithms..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
+            className="form-input"
+            style={{ paddingLeft: '32px', height: '34px', fontSize: '12px', fontFamily: 'var(--font-mono)' }}
           />
         </div>
 
-        <div className="filter-group">
-          <div className="filter-select-item">
-            <Filter size={14} />
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
+            <Filter size={12} />
             <select
               value={selectedSubject}
               onChange={e => setSelectedSubject(e.target.value)}
+              className="form-input"
+              style={{ height: '32px', padding: '0 8px', fontSize: '11px' }}
             >
-              <option value="all">All Subjects</option>
+              <option value="all">All Disciplines</option>
               {allAvailableSubjects.map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
 
-          <div className="filter-select-item">
-            <ArrowUpDown size={14} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
+            <ArrowUpDown size={12} />
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
+              className="form-input"
+              style={{ height: '32px', padding: '0 8px', fontSize: '11px' }}
             >
-              <option value="updated">Recently Updated</option>
+              <option value="updated">Recently Active</option>
               <option value="title">Title (A-Z)</option>
-              <option value="progress">Highest Progress</option>
             </select>
           </div>
         </div>
@@ -169,229 +172,162 @@ export default function LearningPage() {
 
       {/* Path Cards Grid */}
       {loading ? (
-        <div className="learning-cards-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
           {[1, 2, 3].map(n => (
-            <div key={n} className="skeleton-box" style={{ height: '220px', borderRadius: 'var(--radius-xl)' }} />
+            <div key={n} className="skeleton-box" style={{ height: '220px', borderRadius: '2px' }} />
           ))}
         </div>
       ) : filteredPaths.length > 0 ? (
-        <div className="learning-cards-grid">
-          {filteredPaths.map(path => (
-            <div
-              key={path._id}
-              className="learning-path-card"
-              style={{ '--path-accent': path.color || '#6C63FF' }}
-              onClick={() => navigate(`/learning/${path._id}`)}
-            >
-              <div className="path-card-header">
-                <div className="path-subject-badge" style={{ backgroundColor: path.color || '#6C63FF' }}>
-                  {path.subject || 'General'}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+          {filteredPaths.map((path, idx) => {
+            const blogsCount = path.totalBlogs ?? (path.blogs ? path.blogs.length : 0);
+            return (
+              <div
+                key={path._id}
+                className="mx-card"
+                style={{ 
+                  padding: '20px', 
+                  cursor: 'pointer', 
+                  borderTop: '3px solid var(--color-text-primary, #141413)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  transition: 'box-shadow 0.2s, transform 0.2s'
+                }}
+                onClick={() => navigate(`/learning/${path._id}`)}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span className="telemetry-tag" style={{ textTransform: 'uppercase' }}>
+                      TRACK // 0{idx + 1} · {path.subject || 'GENERAL'}
+                    </span>
+                    <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent, #E03E2D)', fontWeight: 600 }}>
+                      {path.difficulty || 'INTERMEDIATE'}
+                    </span>
+                  </div>
+
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 6px 0', color: 'var(--color-text-primary, #141413)' }}>
+                    {path.title}
+                  </h3>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                    {path.description || 'Dedicated technical learning journal and knowledge repository.'}
+                  </p>
                 </div>
-                <div className="path-difficulty-badge">
-                  {path.difficulty || 'Intermediate'}
+
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid var(--color-border-subtle)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
+                    <div style={{ color: 'var(--color-text-secondary)' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--color-text-primary, #141413)' }}>
+                        {blogsCount}
+                      </span>
+                      <span> {blogsCount === 1 ? 'blog article' : 'blog articles'}</span>
+                    </div>
+                    <span style={{ color: 'var(--color-accent, #E03E2D)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                      OPEN BLOGS <ChevronRight size={13} />
+                    </span>
+                  </div>
                 </div>
               </div>
-
-              <h2 className="path-card-title">{path.title}</h2>
-              <p className="path-card-desc">
-                {path.description || 'Structured learning path with modules and topics.'}
-              </p>
-
-              <div className="path-progress-container">
-                <div className="path-progress-meta">
-                  <span>Progress</span>
-                  <span className="pct-val">{path.progress || 0}%</span>
-                </div>
-                <div className="progress-bar">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${path.progress || 0}%`, backgroundColor: path.color || '#6C63FF' }}
-                  />
-                </div>
-              </div>
-
-              <div className="path-stats-row">
-                <div className="path-stat">
-                  <CheckCircle size={14} />
-                  <span>{path.completedTopics || 0} / {path.totalTopics || 0} topics</span>
-                </div>
-                <div className="path-stat">
-                  <Clock size={14} />
-                  <span>{path.formattedStudyTime || '0h'}</span>
-                </div>
-              </div>
-
-              <div className="path-card-footer">
-                <div className="current-topic-info">
-                  <span className="lbl">CURRENT TOPIC:</span>
-                  <span className="val">{path.currentTopic || 'Dynamic Programming'}</span>
-                </div>
-                <button
-                  className="btn btn-secondary btn-sm continue-btn"
-                  onClick={e => {
-                    e.stopPropagation();
-                    navigate(`/learning/${path._id}`);
-                  }}
-                >
-                  <span>Continue</span>
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <div className="learning-empty-card">
-          <div className="empty-icon-wrap">
-            <BookOpen size={36} className="empty-icon" strokeWidth={1.75} />
-          </div>
-          <h3>Start your learning journey</h3>
-          <p>Create a learning path and break it into modules and topics.</p>
-          <div className="empty-features">
-            <span className="empty-feature-chip">
-              <Layers size={12} /> Modules & topics
-            </span>
-            <span className="empty-feature-chip">
-              <Target size={12} /> Track goals
-            </span>
-            <span className="empty-feature-chip">
-              <Trophy size={12} /> Measure progress
-            </span>
-          </div>
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)}>
-            <Plus size={16} />
-            <span>Create Learning Path</span>
+        <div className="mx-card" style={{ padding: '60px 20px', textAlign: 'center' }}>
+          <BookOpen size={36} color="var(--color-text-tertiary)" style={{ margin: '0 auto 12px auto' }} />
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary, #141413)' }}>No Learning Tracks Created</h3>
+          <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', maxWidth: '400px', margin: '4px auto 16px auto' }}>
+            Create a learning track to write technical blogs, markdown notes, code snippets, and study documentation.
+          </p>
+          <button className="btn btn-primary" style={{ fontSize: '12px' }} onClick={() => setShowCreateModal(true)}>
+            <Plus size={14} /> Create Learning Track
           </button>
         </div>
       )}
 
       {/* Create Learning Path Modal */}
       {showCreateModal && (
-        <div className="modal-backdrop" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content modal-lg" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-header-icon">
-                <Route size={22} strokeWidth={2} />
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)' }} onClick={() => setShowCreateModal(false)}>
+          <div className="mx-card" style={{ width: '450px', padding: '24px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', letterSpacing: '0.08em' }}>
+                  ■ NEW TRACK INITIALIZATION
+                </span>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '2px 0 0 0' }}>Dispatch Learning Track</h3>
               </div>
-              <div className="modal-header-text">
-                <h2>Create Learning Path</h2>
-                <p className="modal-subtitle">Design a structured roadmap to master your subject</p>
-              </div>
-              <button className="modal-close-btn" onClick={() => setShowCreateModal(false)} aria-label="Close">
-                <X size={18} />
+              <button onClick={() => setShowCreateModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreatePath} className="modal-form">
-              <div className="form-group">
-                <label>Path Name <span className="req">*</span></label>
+            <form onSubmit={handleCreatePath} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>TRACK NAME *</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Data Structures & Algorithms"
+                  placeholder="e.g. Distributed Consensus & Raft Protocols"
                   value={formData.title}
                   onChange={e => setFormData({ ...formData, title: e.target.value })}
+                  className="form-input"
+                  style={{ fontSize: '13px' }}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Subject</label>
-                {allAvailableSubjects.length > 0 && (
-                  <div className="subject-chip-grid" style={{ marginBottom: '8px' }}>
-                    {allAvailableSubjects.map(s => {
-                      const color = getSubjectColor(s);
-                      return (
-                        <button
-                          type="button"
-                          key={s}
-                          className={`subject-chip ${formData.subject === s ? 'active' : ''}`}
-                          style={{ '--chip-color': color }}
-                          onClick={() => setFormData({ ...formData, subject: s, color })}
-                        >
-                          <span className="chip-dot" />
-                          {s}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>PRIMARY SUBJECT / DOMAIN</label>
                 <input
                   type="text"
-                  placeholder="Subject name (e.g. DSA, Mathematics, System Design)..."
+                  placeholder="e.g. Distributed Systems, Algorithms, Memory Models..."
                   value={formData.subject}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setFormData({
-                      ...formData,
-                      subject: val,
-                      color: getSubjectColor(val)
-                    });
-                  }}
+                  onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                  className="form-input"
+                  style={{ fontSize: '12px' }}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Difficulty</label>
-                <div className="difficulty-segment">
-                  {DIFFICULTIES.map(d => (
-                    <button
-                      type="button"
-                      key={d}
-                      className={`segment-btn ${formData.difficulty === d ? 'active' : ''}`}
-                      onClick={() => setFormData({ ...formData, difficulty: d })}
-                    >
-                      {d}
-                    </button>
-                  ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>DIFFICULTY TIER</label>
+                  <select
+                    className="form-input"
+                    value={formData.difficulty}
+                    onChange={e => setFormData({ ...formData, difficulty: e.target.value })}
+                    style={{ fontSize: '12px' }}
+                  >
+                    {DIFFICULTIES.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>TARGET HORIZON</label>
+                  <input
+                    type="date"
+                    value={formData.targetDate}
+                    onChange={e => setFormData({ ...formData, targetDate: e.target.value })}
+                    className="form-input"
+                    style={{ fontSize: '12px', fontFamily: 'var(--font-mono)' }}
+                  />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Target Date</label>
-                <input
-                  type="date"
-                  value={formData.targetDate}
-                  onChange={e => setFormData({ ...formData, targetDate: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Description</label>
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>SYLLABUS DESCRIPTION</label>
                 <textarea
-                  rows="3"
-                  placeholder="What do you want to learn in this path?"
+                  rows={2}
+                  placeholder="Core themes, papers to read, and problem sets..."
                   value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
+                  className="form-input"
+                  style={{ fontSize: '12px' }}
                 />
               </div>
 
-              <div className="form-group">
-                <label>Goal</label>
-                <input
-                  type="text"
-                  placeholder="What do you want to achieve?"
-                  value={formData.goal}
-                  onChange={e => setFormData({ ...formData, goal: e.target.value })}
-                />
-                <span className="field-hint">Your main outcome for completing this path</span>
-              </div>
-
-              <div className="modal-actions">
-                <button type="button" className="btn btn-ghost" onClick={() => setShowCreateModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={creating}>
-                  {creating ? (
-                    <>
-                      <Sparkles size={14} className="spin-once" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={14} />
-                      Create Path
-                    </>
-                  )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowCreateModal(false)} style={{ fontSize: '12px' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={creating} style={{ fontSize: '12px' }}>
+                  {creating ? 'Initializing...' : 'Initialize Track'}
                 </button>
               </div>
             </form>
