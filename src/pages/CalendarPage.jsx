@@ -57,6 +57,7 @@ export default function CalendarPage() {
   const [todos, setTodos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filterType, setFilterType] = useState('ALL');
+  const [selectedTodo, setSelectedTodo] = useState(null);
 
   // Quick form for tasks
   const [showTaskForm, setShowTaskForm] = useState(false);
@@ -643,7 +644,7 @@ export default function CalendarPage() {
 
                     return (
                       <div
-                        key={cellKey}
+                        key={`${cellKey}-${cellIndex}`}
                         style={{
                           height: '120px',
                           padding: '6px',

@@ -159,21 +159,21 @@ export default function TodayPage() {
 
       {/* Main Dashboard Todos */}
       <div style={{ marginBottom: 'var(--space-6)' }}>
-        <TodoOverview key={todayKey} todos={d.todos} />
+        <TodoOverview todos={d.todos} />
       </div>
 
       <div className="dashboard-grid">
         {/* Left column: Study Activity */}
-        <StudyActivity key={todayKey} sessions={d.studySessions} />
+        <StudyActivity sessions={d.studySessions} />
         {/* Right column: Weekly Chart */}
         <StudyChart weeklyData={d.weeklyStudy} />
       </div>
 
       <div className="dashboard-grid">
         {/* Left column: Learning Progress */}
-        <LearningProgress key={todayKey} paths={learningPaths} />
+        <LearningProgress paths={learningPaths} />
         {/* Right column: Goals */}
-        <GoalsOverview key={todayKey} goals={d.goals} />
+        <GoalsOverview goals={d.goals} />
       </div>
     </div>
   );
