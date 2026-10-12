@@ -3,13 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   BookOpen, Plus, Clock, CheckCircle, Target, Layers, Calendar,
   ChevronRight, Play, FileText, CheckSquare, Bookmark, ArrowLeft,
-  Edit, Trash2, ChevronDown, Check, AlertCircle, ExternalLink
+  Edit, Edit3, Trash2, ChevronDown, Check, AlertCircle, ExternalLink
 } from 'lucide-react';
 import {
   getFullLearningPath, createModule, updateModule, deleteModule,
   createTopic, updateTopic, deleteTopic, createTodo, createResource
 } from '../services/api';
 import { useTimer } from '../context/TimerContext';
+import LearningPathBlogs from '../components/LearningPathBlogs';
 
 export default function LearningPathDetailPage() {
   const { id } = useParams();
@@ -18,6 +19,8 @@ export default function LearningPathDetailPage() {
 
   const [pathData, setPathData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('roadmap'); // 'roadmap' | 'blogs'
+  const [blogCount, setBlogCount] = useState(0);
 
   // Modals state
   const [showAddModule, setShowAddModule] = useState(false);
@@ -47,7 +50,10 @@ export default function LearningPathDetailPage() {
     setLoading(true);
     getFullLearningPath(id)
       .then(res => {
-        if (res.data?.success) setPathData(res.data.data);
+        if (res.data?.success) {
+          setPathData(res.data.data);
+          setBlogCount(res.data.data.totalBlogs || res.data.data.blogs?.length || 0);
+        }
       })
       .catch(err => console.error('Error fetching full path:', err))
       .finally(() => setLoading(false));
@@ -234,6 +240,10 @@ export default function LearningPathDetailPage() {
             <Play size={16} />
             <span>Continue Learning</span>
           </button>
+          <button className="btn btn-secondary" onClick={() => setActiveTab('blogs')}>
+            <Edit3 size={16} />
+            <span>Write Blog</span>
+          </button>
           <button className="btn btn-secondary" onClick={() => setShowAddModule(true)}>
             <Plus size={16} />
             <span>Add Module</span>
@@ -241,7 +251,7 @@ export default function LearningPathDetailPage() {
         </div>
       </div>
 
-      {/* Summary Cards Row (6 Cards) */}
+      {/* Summary Cards Row */}
       <div className="path-summary-grid">
         <div className="summary-card">
           <span className="summary-card-title">PROGRESS</span>
@@ -269,6 +279,12 @@ export default function LearningPathDetailPage() {
           <span className="summary-card-footer">Completed tasks</span>
         </div>
 
+        <div className="summary-card" onClick={() => setActiveTab('blogs')} style={{ cursor: 'pointer' }} title="Click to view stories">
+          <span className="summary-card-title">BLOGS</span>
+          <span className="summary-card-value">{blogCount}</span>
+          <span className="summary-card-footer">Stories written</span>
+        </div>
+
         <div className="summary-card">
           <span className="summary-card-title">RESOURCES</span>
           <span className="summary-card-value">{pathData.totalResources || 0}</span>
@@ -282,117 +298,147 @@ export default function LearningPathDetailPage() {
         </div>
       </div>
 
-      {/* Roadmap Section */}
-      <div className="roadmap-section">
-        <div className="section-header">
-          <div>
-            <h2>Learning Roadmap</h2>
-            <p>Modules and topics structured sequentially</p>
+      {/* Section Tab Navigation */}
+      <div className="learning-tab-nav">
+        <button
+          type="button"
+          className={`learning-tab-btn ${activeTab === 'roadmap' ? 'active' : ''}`}
+          onClick={() => setActiveTab('roadmap')}
+        >
+          <Layers size={16} />
+          <span>Curriculum & Roadmap</span>
+        </button>
+        <button
+          type="button"
+          className={`learning-tab-btn ${activeTab === 'blogs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('blogs')}
+        >
+          <BookOpen size={16} />
+          <span>Blogs & Stories</span>
+          <span className="learning-tab-badge">{blogCount}</span>
+        </button>
+      </div>
+
+      {/* Main Tab Content */}
+      {activeTab === 'roadmap' ? (
+        <div className="roadmap-section">
+          <div className="section-header">
+            <div>
+              <h2>Learning Roadmap</h2>
+              <p>Modules and topics structured sequentially</p>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowAddModule(true)}>
+              <Plus size={14} /> Add Module
+            </button>
           </div>
-          <button className="btn btn-secondary btn-sm" onClick={() => setShowAddModule(true)}>
-            <Plus size={14} /> Add Module
-          </button>
-        </div>
 
-        <div className="modules-roadmap-list">
-          {pathData.modules?.length > 0 ? (
-            pathData.modules.map((mod, modIdx) => (
-              <div key={mod._id} className="module-card">
-                <div className="module-header">
-                  <div className="module-title-group">
-                    <span className="module-order-num">{String(modIdx + 1).padStart(2, '0')}</span>
-                    <div>
-                      <h3 className="module-title">{mod.title}</h3>
-                      {mod.description && <p className="module-desc">{mod.description}</p>}
-                    </div>
-                  </div>
-
-                  <div className="module-meta">
-                    <span className="module-progress-badge">{mod.progress || 0}% Complete</span>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => {
-                        setTargetModuleId(mod._id);
-                        setShowAddTopic(true);
-                      }}
-                    >
-                      <Plus size={14} /> Topic
-                    </button>
-                  </div>
-                </div>
-
-                {/* Topics List */}
-                <div className="topics-list">
-                  {mod.topics?.length > 0 ? (
-                    mod.topics.map((tp) => (
-                      <div
-                        key={tp._id}
-                        className={`topic-row-item status-${tp.status}`}
-                        onClick={() => {
-                          setSelectedTopic(tp);
-                          setTopicNotes(tp.notes || '');
-                        }}
-                      >
-                        <div className="topic-status-icon">
-                          {tp.status === 'completed' ? (
-                            <CheckCircle size={18} className="icon-completed" />
-                          ) : tp.status === 'in_progress' ? (
-                            <div className="dot-in-progress" />
-                          ) : (
-                            <div className="dot-not-started" />
-                          )}
-                        </div>
-
-                        <div className="topic-info-col">
-                          <span className="topic-title">{tp.title}</span>
-                          {tp.description && <span className="topic-desc">{tp.description}</span>}
-                        </div>
-
-                        <div className="topic-badges-col">
-                          <span className="topic-meta-badge"><Clock size={12} /> {tp.formattedStudyTime}</span>
-                          <span className="topic-meta-badge"><Bookmark size={12} /> {tp.resourceCount}</span>
-                          <span className="topic-meta-badge"><CheckSquare size={12} /> {tp.todoCount}</span>
-                        </div>
-
-                        <button
-                          className="btn btn-primary btn-sm topic-study-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartStudySession(tp, mod);
-                          }}
-                        >
-                          <Play size={12} /> Study
-                        </button>
+          <div className="modules-roadmap-list">
+            {pathData.modules?.length > 0 ? (
+              pathData.modules.map((mod, modIdx) => (
+                <div key={mod._id} className="module-card">
+                  <div className="module-header">
+                    <div className="module-title-group">
+                      <span className="module-order-num">{String(modIdx + 1).padStart(2, '0')}</span>
+                      <div>
+                        <h3 className="module-title">{mod.title}</h3>
+                        {mod.description && <p className="module-desc">{mod.description}</p>}
                       </div>
-                    ))
-                  ) : (
-                    <div className="empty-topic-placeholder">
-                      <span>No topics added yet.</span>
+                    </div>
+
+                    <div className="module-meta">
+                      <span className="module-progress-badge">{mod.progress || 0}% Complete</span>
                       <button
-                        className="btn btn-link btn-sm"
+                        className="btn btn-ghost btn-sm"
                         onClick={() => {
                           setTargetModuleId(mod._id);
                           setShowAddTopic(true);
                         }}
                       >
-                        + Add first topic
+                        <Plus size={14} /> Topic
                       </button>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Topics List */}
+                  <div className="topics-list">
+                    {mod.topics?.length > 0 ? (
+                      mod.topics.map((tp) => (
+                        <div
+                          key={tp._id}
+                          className={`topic-row-item status-${tp.status}`}
+                          onClick={() => {
+                            setSelectedTopic(tp);
+                            setTopicNotes(tp.notes || '');
+                          }}
+                        >
+                          <div className="topic-status-icon">
+                            {tp.status === 'completed' ? (
+                              <CheckCircle size={18} className="icon-completed" />
+                            ) : tp.status === 'in_progress' ? (
+                              <div className="dot-in-progress" />
+                            ) : (
+                              <div className="dot-not-started" />
+                            )}
+                          </div>
+
+                          <div className="topic-info-col">
+                            <span className="topic-title">{tp.title}</span>
+                            {tp.description && <span className="topic-desc">{tp.description}</span>}
+                          </div>
+
+                          <div className="topic-badges-col">
+                            <span className="topic-meta-badge"><Clock size={12} /> {tp.formattedStudyTime}</span>
+                            <span className="topic-meta-badge"><Bookmark size={12} /> {tp.resourceCount}</span>
+                            <span className="topic-meta-badge"><CheckSquare size={12} /> {tp.todoCount}</span>
+                          </div>
+
+                          <button
+                            className="btn btn-primary btn-sm topic-study-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartStudySession(tp, mod);
+                            }}
+                          >
+                            <Play size={12} /> Study
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="empty-topic-placeholder">
+                        <span>No topics added yet.</span>
+                        <button
+                          className="btn btn-link btn-sm"
+                          onClick={() => {
+                            setTargetModuleId(mod._id);
+                            setShowAddTopic(true);
+                          }}
+                        >
+                          + Add first topic
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="empty-chart-box">
+                <Layers size={36} />
+                <p>No modules created yet. Add your first module to build the roadmap.</p>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowAddModule(true)}>
+                  <Plus size={16} /> Add Module
+                </button>
               </div>
-            ))
-          ) : (
-            <div className="empty-chart-box">
-              <Layers size={36} />
-              <p>No modules created yet. Add your first module to build the roadmap.</p>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowAddModule(true)}>
-                <Plus size={16} /> Add Module
-              </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <LearningPathBlogs
+          learningPathId={pathData._id}
+          learningPathTitle={pathData.title}
+          initialBlogs={pathData.blogs || []}
+          onBlogCountChange={setBlogCount}
+        />
+      )}
 
       {/* Selected Topic Workspace Drawer / Modal */}
       {selectedTopic && (

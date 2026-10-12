@@ -151,7 +151,7 @@ export default function TodayPage() {
           icon={CheckSquare}
           iconBg="var(--color-success-light)"
           iconColor="var(--color-success-text)"
-          value={`${stats.tasksCompleted} / ${stats.totalTasks}`}
+          value={stats.totalTasks > 0 ? `${stats.tasksCompleted} / ${stats.totalTasks}` : '0'}
           label="Tasks completed"
         />
         <StatCard

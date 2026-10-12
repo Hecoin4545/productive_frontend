@@ -4,16 +4,15 @@ import {
   BookOpen, Plus, Search, Filter, ArrowUpDown, Clock, CheckCircle,
   Target, Layers, Calendar, ChevronRight, X, Sparkles, Route, Trophy
 } from 'lucide-react';
-import { getLearningPaths, createLearningPath } from '../services/api';
+import { getLearningPaths, createLearningPath, getProfile } from '../services/api';
 
-const SUBJECTS = [
-  { name: 'DSA', color: '#6C63FF' },
-  { name: 'Machine Learning', color: '#22C55E' },
-  { name: 'Web Development', color: '#F59E0B' },
-  { name: 'Mathematics', color: '#06B6D4' },
-  { name: 'System Design', color: '#EF4444' },
-  { name: 'Other', color: '#8B5CF6' },
-];
+const PALETTE = ['#6C63FF', '#22C55E', '#F59E0B', '#8B5CF6', '#06B6D4', '#EF4444', '#EC4899', '#14B8A6'];
+const getSubjectColor = (name) => {
+  if (!name) return '#6C63FF';
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return PALETTE[Math.abs(hash) % PALETTE.length];
+};
 
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced'];
 
@@ -21,6 +20,7 @@ export default function LearningPage() {
   const navigate = useNavigate();
 
   const [paths, setPaths] = useState([]);
+  const [userSubjects, setUserSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
@@ -32,7 +32,7 @@ export default function LearningPage() {
     title: '',
     description: '',
     goal: '',
-    subject: 'DSA',
+    subject: '',
     difficulty: 'Intermediate',
     targetDate: '',
     color: '#6C63FF'
@@ -53,7 +53,19 @@ export default function LearningPage() {
 
   useEffect(() => {
     fetchPaths();
+    getProfile()
+      .then(res => {
+        if (res.data?.success && res.data.user?.customSubjects) {
+          setUserSubjects(res.data.user.customSubjects);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  const allAvailableSubjects = [...new Set([
+    ...userSubjects,
+    ...paths.map(p => p.subject).filter(Boolean)
+  ])];
 
   const handleCreatePath = async (e) => {
     e.preventDefault();
@@ -135,8 +147,8 @@ export default function LearningPage() {
               onChange={e => setSelectedSubject(e.target.value)}
             >
               <option value="all">All Subjects</option>
-              {SUBJECTS.map(s => (
-                <option key={s.name} value={s.name}>{s.name}</option>
+              {allAvailableSubjects.map(s => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
@@ -284,20 +296,38 @@ export default function LearningPage() {
 
               <div className="form-group">
                 <label>Subject</label>
-                <div className="subject-chip-grid">
-                  {SUBJECTS.map(s => (
-                    <button
-                      type="button"
-                      key={s.name}
-                      className={`subject-chip ${formData.subject === s.name ? 'active' : ''}`}
-                      style={{ '--chip-color': s.color }}
-                      onClick={() => setFormData({ ...formData, subject: s.name, color: s.color })}
-                    >
-                      <span className="chip-dot" />
-                      {s.name}
-                    </button>
-                  ))}
-                </div>
+                {allAvailableSubjects.length > 0 && (
+                  <div className="subject-chip-grid" style={{ marginBottom: '8px' }}>
+                    {allAvailableSubjects.map(s => {
+                      const color = getSubjectColor(s);
+                      return (
+                        <button
+                          type="button"
+                          key={s}
+                          className={`subject-chip ${formData.subject === s ? 'active' : ''}`}
+                          style={{ '--chip-color': color }}
+                          onClick={() => setFormData({ ...formData, subject: s, color })}
+                        >
+                          <span className="chip-dot" />
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <input
+                  type="text"
+                  placeholder="Subject name (e.g. DSA, Mathematics, System Design)..."
+                  value={formData.subject}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setFormData({
+                      ...formData,
+                      subject: val,
+                      color: getSubjectColor(val)
+                    });
+                  }}
+                />
               </div>
 
               <div className="form-group">

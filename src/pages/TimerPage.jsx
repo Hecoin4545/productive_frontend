@@ -58,27 +58,16 @@ function formatTimeOfDay(dateStr) {
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-const SUBJECTS = [
-  'Data Structures & Algorithms',
-  'Machine Learning',
-  'Web Development',
-  'Competitive Programming',
-  'Mathematics',
-  'System Design',
-  'College',
-  'Other'
-];
+// No pre-defined subjects — only user-created ones are shown
+const SUBJECTS = [];
 
-const subjectColors = {
-  'Data Structures & Algorithms': '#6C63FF',
-  'Machine Learning': '#22C55E',
-  'Web Development': '#F59E0B',
-  'Competitive Programming': '#8B5CF6',
-  'Mathematics': '#06B6D4',
-  'System Design': '#EF4444',
-  'College': '#EC4899',
-  'Other': '#9B9B9B',
-  'General': '#6B6B6B'
+const PALETTE = ['#6C63FF', '#22C55E', '#F59E0B', '#8B5CF6', '#06B6D4', '#EF4444', '#EC4899', '#14B8A6', '#6366F1', '#3B82F6'];
+const getSubjectColor = (name) => {
+  if (!name) return '#6C63FF';
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  const index = Math.abs(hash) % PALETTE.length;
+  return PALETTE[index];
 };
 
 // ─── Timer Page ─────────────────────────────────────────
@@ -94,7 +83,7 @@ export default function TimerPage() {
   } = timer;
 
   // Setup state
-  const [subject, setSubject] = useState('Data Structures & Algorithms');
+  const [subject, setSubject] = useState('');
   const [learningPaths, setLearningPaths] = useState([]);
   const [customSubjects, setCustomSubjects] = useState([]);
   const [isAddingSubject, setIsAddingSubject] = useState(false);
@@ -128,7 +117,7 @@ export default function TimerPage() {
     const now = new Date();
     const pad = (n) => String(n).padStart(2, '0');
     return {
-      subject: 'College',
+      subject: '',
       learningPathId: '',
       moduleName: '',
       topicName: '',
@@ -235,7 +224,7 @@ export default function TimerPage() {
   // Sync setup state from active session
   useEffect(() => {
     if (isActive && sessionConfig) {
-      setSubject(sessionConfig.subject || 'Data Structures & Algorithms');
+      setSubject(sessionConfig.subject || '');
       setModuleName(sessionConfig.moduleName || '');
       setTopicName(sessionConfig.topicName || '');
       setTask(sessionConfig.task || '');
@@ -259,7 +248,21 @@ export default function TimerPage() {
     }
   };
 
-  const allSubjects = [...new Set([...SUBJECTS, ...customSubjects])];
+  const handleDeleteCustomSubject = async (subjectToDelete, e) => {
+    e.stopPropagation();
+    const updatedSubjects = customSubjects.filter(s => s !== subjectToDelete);
+    setCustomSubjects(updatedSubjects);
+    if (subject === subjectToDelete) {
+      setSubject(updatedSubjects[0] || '');
+    }
+    try {
+      await updateProfile({ customSubjects: updatedSubjects });
+    } catch (err) {
+      console.error('Failed to remove custom subject:', err);
+    }
+  };
+
+  const allSubjects = customSubjects;
 
   // ─── Actions ──────────────────────
   const handleStart = () => {
@@ -782,22 +785,46 @@ export default function TimerPage() {
               <div className="timer-setup-field">
                 <label className="form-label">Subject</label>
                 <div className="timer-subject-grid">
-                  {allSubjects.map(s => (
-                    <button
-                      key={s}
-                      className={`timer-subject-btn ${subject === s ? 'active' : ''}`}
-                      onClick={() => setSubject(s)}
-                      style={{
-                        '--subject-color': subjectColors[s] || '#6C63FF'
-                      }}
-                    >
-                      <span
-                        className="timer-subject-dot"
-                        style={{ backgroundColor: subjectColors[s] || '#6C63FF' }}
-                      />
-                      {s}
-                    </button>
-                  ))}
+                  {allSubjects.map(s => {
+                    const color = getSubjectColor(s);
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        className={`timer-subject-btn ${subject === s ? 'active' : ''}`}
+                        onClick={() => setSubject(s)}
+                        style={{
+                          '--subject-color': color
+                        }}
+                      >
+                        <span
+                          className="timer-subject-dot"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span>{s}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          title={`Remove ${s}`}
+                          style={{
+                            marginLeft: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            opacity: 0.6,
+                            cursor: 'pointer'
+                          }}
+                          onClick={(e) => handleDeleteCustomSubject(s, e)}
+                        >
+                          <X size={12} />
+                        </span>
+                      </button>
+                    );
+                  })}
+                  {allSubjects.length === 0 && !isAddingSubject && (
+                    <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', alignSelf: 'center', marginRight: '8px' }}>
+                      No subjects added yet.
+                    </span>
+                  )}
                   
                   {isAddingSubject ? (
                     <div className="timer-add-subject-input-wrapper">

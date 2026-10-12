@@ -83,6 +83,13 @@ export const createTopic = (data) => api.post('/learning-paths/topics', data);
 export const updateTopic = (id, data) => api.put(`/learning-paths/topics/${id}`, data);
 export const deleteTopic = (id) => api.delete(`/learning-paths/topics/${id}`);
 
+// Learning Path Blogs / Medium-style Stories
+export const getPathBlogs = (pathId) => api.get(`/learning-paths/${pathId}/blogs`);
+export const getPathBlog = (pathId, blogId) => api.get(`/learning-paths/${pathId}/blogs/${blogId}`);
+export const createPathBlog = (pathId, data) => api.post(`/learning-paths/${pathId}/blogs`, data);
+export const updatePathBlog = (pathId, blogId, data) => api.put(`/learning-paths/${pathId}/blogs/${blogId}`, data);
+export const deletePathBlog = (pathId, blogId) => api.delete(`/learning-paths/${pathId}/blogs/${blogId}`);
+
 // Resources & Folders
 export const getResources = (params) => api.get('/resources', { params });
 export const getResource = (id) => api.get(`/resources/${id}`);
