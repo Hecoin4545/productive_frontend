@@ -1,12 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api.js';
 
 const AuthContext = createContext(null);
-
-const API_URL = 'http://localhost:5000/api';
-
-// Configure axios defaults
-axios.defaults.withCredentials = true;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -25,9 +20,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const res = await axios.get(`${API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+       const res = await api.get('/auth/me');
       if (res.data.success) {
         setUser(res.data.user);
       }
@@ -40,7 +33,7 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setError('');
     try {
-      const res = await axios.post(`${API_URL}/auth/login`, { email, password });
+      const res = await api.post('/auth/login', { email, password });
       if (res.data.success) {
         localStorage.setItem('arcstep_token', res.data.token);
         setUser(res.data.user);
@@ -55,7 +48,7 @@ export function AuthProvider({ children }) {
   const register = async (name, email, password) => {
     setError('');
     try {
-      const res = await axios.post(`${API_URL}/auth/register`, { name, email, password });
+      const res = await api.post('/auth/register', { name, email, password });
       if (res.data.success) {
         localStorage.setItem('arcstep_token', res.data.token);
         setUser(res.data.user);
@@ -70,7 +63,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('arcstep_token');
     setUser(null);
-    axios.post(`${API_URL}/auth/logout`).catch(() => {});
+    api.post('/auth/logout').catch(() => {});
   };
 
   return (
