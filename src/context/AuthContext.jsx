@@ -20,7 +20,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-       const res = await api.get('/auth/me');
+     const res = await api.get('/auth/me');
       if (res.data.success) {
         setUser(res.data.user);
       }
@@ -39,8 +39,15 @@ export function AuthProvider({ children }) {
         setUser(res.data.user);
         return true;
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      } catch (err) {
+      setUser(null);
+      if (err.response) {
+        setError(err.response.data?.message || 'Authentication failed');
+      } else if (err.request) {
+        setError('Cannot reach the server. Check your connection.');
+      } else {
+        setError('Login failed');
+      }
       return false;
     }
   };
@@ -54,8 +61,15 @@ export function AuthProvider({ children }) {
         setUser(res.data.user);
         return true;
       }
+      throw new Error(res.data?.message || 'Registration failed');
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      if (err.response) {
+        setError(err.response.data?.message || 'Server error');
+      } else if (err.request) {
+        setError('Cannot reach the server. Check your connection.');
+      } else {
+        setError(err.message || 'Registration failed');
+      }
       return false;
     }
   };
