@@ -65,6 +65,7 @@ export default function CalendarPage() {
   const [editingId, setEditingId] = useState(null);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -161,6 +162,22 @@ export default function CalendarPage() {
     }
   };
 
+  const handleQuickDelete = async (todo, e) => {
+    e?.stopPropagation();
+    if (!todo) return;
+    if (!window.confirm(`Remove "${todo.title}"?`)) return;
+    try {
+      await deleteTodo(todo._id);
+      if (selectedTodo && selectedTodo._id === todo._id) setSelectedTodo(null);
+      if (editingId === todo._id) resetForm();
+      fetchTodos();
+      setNotice('Session removed.');
+    } catch (err) {
+      console.error('Error deleting todo:', err);
+      setNotice('Could not delete session.');
+    }
+  };
+
   const openTaskForm = (dateKey, time) => {
     setFormError('');
     setEditingId(null);
@@ -185,6 +202,7 @@ export default function CalendarPage() {
 
   const handleSaveTask = async (e) => {
     e.preventDefault();
+    if (saving) return;
 
     const duration = parseInt(taskForm.duration, 10);
     if (!Number.isFinite(duration) || duration < 5 || duration > 720) {
@@ -192,15 +210,21 @@ export default function CalendarPage() {
       return;
     }
 
+    // Build dueDate as a local Date object to avoid UTC/local timezone mismatch
+    const [year, month, day] = taskForm.date.split('-').map(Number);
+    const [hour, minute] = taskForm.time.split(':').map(Number);
+    const localDueDate = new Date(year, month - 1, day, hour, minute, 0);
+
     const payload = {
       title: taskForm.title,
       description: `Subject: ${taskForm.subject || 'Deep Work'}`,
-      dueDate: `${taskForm.date}T${taskForm.time}:00`,
+      dueDate: localDueDate.toISOString(),
       estimatedDuration: `${duration}`,
       priority: 'medium',
       completed: false
     };
 
+    setSaving(true);
     try {
       if (editingId) {
         delete payload.priority;
@@ -222,6 +246,8 @@ export default function CalendarPage() {
     } catch (err) {
       console.error(err);
       setFormError(editingId ? 'Could not update session.' : 'Could not schedule session.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -487,8 +513,8 @@ export default function CalendarPage() {
                                   </span>
                                   <button
                                     type="button"
-                                    onClick={(e) => handleToggleTaskCompletion(todo, e)}
-                                    title={todo.completed ? 'Completed (click to unmark)' : 'Incomplete (click to finish)'}
+                                    onClick={(e) => todo.completed ? handleToggleTaskCompletion(todo, e) : handleQuickDelete(todo, e)}
+                                    title={todo.completed ? 'Completed (click to unmark)' : 'Remove this block'}
                                     style={{
                                       background: 'none',
                                       border: 'none',
@@ -596,8 +622,8 @@ export default function CalendarPage() {
                               </span>
                               <button
                                 type="button"
-                                onClick={(e) => handleToggleTaskCompletion(todo, e)}
-                                title={todo.completed ? 'Completed (click to unmark)' : 'Incomplete (click to finish)'}
+                                onClick={(e) => todo.completed ? handleToggleTaskCompletion(todo, e) : handleQuickDelete(todo, e)}
+                                title={todo.completed ? 'Completed (click to unmark)' : 'Remove this block'}
                                 style={{
                                   background: 'none',
                                   border: 'none',
@@ -701,9 +727,10 @@ export default function CalendarPage() {
                                 marginLeft: '4px', 
                                 fontWeight: 800, 
                                 fontSize: '10px', 
-                                color: t.completed ? 'var(--color-success, #16A34A)' : '#DC2626' 
+                                color: t.completed ? 'var(--color-success, #16A34A)' : '#DC2626',
+                                cursor: 'pointer'
                               }}
-                              onClick={(e) => handleToggleTaskCompletion(t, e)}
+                              onClick={(e) => t.completed ? handleToggleTaskCompletion(t, e) : handleQuickDelete(t, e)}
                             >
                               {t.completed ? '✓' : '✕'}
                             </span>
@@ -878,9 +905,10 @@ export default function CalendarPage() {
                 <button 
                   type="submit" 
                   className="btn btn-primary" 
-                  style={{ fontSize: '12px', padding: '6px 16px' }}
+                  style={{ fontSize: '12px', padding: '6px 16px', opacity: saving ? 0.6 : 1 }}
+                  disabled={saving}
                 >
-                  {editingId ? 'Save Block' : 'Dispatch Block'}
+                  {saving ? 'Saving…' : (editingId ? 'Save Block' : 'Dispatch Block')}
                 </button>
               </div>
             </form>
