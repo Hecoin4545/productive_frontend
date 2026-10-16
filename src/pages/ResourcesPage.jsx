@@ -399,58 +399,86 @@ export default function ResourcesPage() {
           ) : (
             <div className="vault-cards-grid">
               {resources.map((r, idx) => {
-                const domainLabel = r.type === 'note' ? 'INTERNAL NOTE' : (r.domain || r.type || 'RESEARCH SPEC').toUpperCase();
+                const domainLabel = r.type === 'note' ? 'INTERNAL NOTE' : (r.domain || r.type || 'RESOURCE').toUpperCase();
+                // Extract domain from URL for favicon
+                let faviconUrl = null;
+                let domainName = domainLabel;
+                try {
+                  if (r.url) {
+                    const urlObj = new URL(r.url);
+                    faviconUrl = `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
+                    domainName = urlObj.hostname.replace('www.', '').toUpperCase();
+                  }
+                } catch (e) { /* invalid url */ }
+
                 return (
                   <div 
                     key={r._id} 
                     className="vault-artifact-card"
                     onClick={() => { setSelectedResourceDetail(r); setDrawerNotes(r.notes || ''); }}
                   >
-                    <div className="artifact-top-meta">
-                      <span className="artifact-eyebrow">
-                        ■ {domainLabel}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
-                          REV {idx + 1}
+                    {/* Card Body */}
+                    <div className="artifact-card-body">
+                      {/* Top Row — Domain Badge + Actions */}
+                      <div className="artifact-top-meta">
+                        <span className="artifact-domain-badge">
+                          <span className="favicon-dot">
+                            {faviconUrl ? (
+                              <img src={faviconUrl} alt="" />
+                            ) : (
+                              <Layers size={10} />
+                            )}
+                          </span>
+                          {domainName}
                         </span>
-                        <button 
-                          onClick={(e) => handleToggleFavorite(r, e)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: r.isFavorite ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
-                          title="Bookmark / Star"
-                        >
-                          <Star size={13} fill={r.isFavorite ? 'var(--color-accent)' : 'none'} />
-                        </button>
+                        <div className="artifact-actions-row">
+                          <span className="artifact-rev-label">REV {idx + 1}</span>
+                          <button 
+                            className="artifact-star-btn"
+                            onClick={(e) => handleToggleFavorite(r, e)}
+                            title="Bookmark / Star"
+                          >
+                            <Star size={13} 
+                              fill={r.isFavorite ? 'var(--color-accent)' : 'none'} 
+                              color={r.isFavorite ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
+                            />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Title */}
+                      <h4 className="artifact-title">{r.title}</h4>
+
+                      {/* Description */}
+                      <p className="artifact-desc">
+                        {r.description || 'Deep technical specification indexed for rapid cognitive retrieval in high-focus mode.'}
+                      </p>
+
+                      {/* Tags */}
+                      <div className="artifact-tag-box">
+                        {r.tags && r.tags.length > 0 ? (
+                          r.tags.slice(0, 3).map((tag, ti) => (
+                            <span key={ti} className="artifact-tag-pill">{tag}</span>
+                          ))
+                        ) : (
+                          <span className="artifact-tag-pill">{r.type.toUpperCase()}</span>
+                        )}
                       </div>
                     </div>
 
-                    <h4 className="artifact-title">
-                      {r.title}
-                    </h4>
-
-                    <p className="artifact-desc">
-                      {r.description || 'Deep technical specification indexed for rapid cognitive retrieval in high-focus mode.'}
-                    </p>
-
-                    {/* Tag or Code Spec Snippet */}
-                    <div className="artifact-tag-box">
-                      <span className="artifact-tag-pill">
-                        {r.tags?.[0] ? `INDEX // ${r.tags[0].toUpperCase()}` : 'TXID_CANONICAL == TRUE'}
-                      </span>
-                    </div>
-
+                    {/* Card Footer */}
                     <div className="artifact-footer">
-                      <div style={{ display: 'flex', gap: '8px', fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
+                      <div className="artifact-footer-meta">
+                        <span className="status-dot"></span>
                         <span>{r.notes ? 'HAS NOTES' : 'VERIFIED'}</span>
                         <span>·</span>
                         <span>{r.type.toUpperCase()}</span>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div className="artifact-footer-actions">
                         {r.url && (
                           <button 
                             className="btn btn-secondary" 
-                            style={{ padding: '3px 8px', fontSize: '10px' }}
                             onClick={(e) => handleOpenResource(r, e)}
                             title="Open external source"
                           >
@@ -458,8 +486,7 @@ export default function ResourcesPage() {
                           </button>
                         )}
                         <button 
-                          className="btn btn-secondary" 
-                          style={{ padding: '3px 6px', fontSize: '10px', color: 'var(--color-accent)' }}
+                          className="btn btn-delete" 
                           onClick={(e) => handleDeleteResource(r._id, e)}
                           title="Delete artifact"
                         >
