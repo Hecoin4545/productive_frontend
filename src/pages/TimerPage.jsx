@@ -10,7 +10,7 @@ import {
 import PageHeader from '../components/PageHeader.jsx';
 import {
   createStudySession, getStudySessions, getStudySessionStats, getLearningPaths,
-  getProfile, updateProfile
+  getProfile, updateProfile, createTodo
 } from '../services/api.js';
 import '../index.css';
 
@@ -152,8 +152,22 @@ export default function TimerPage() {
   const [sessionNotes, setSessionNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Manual entry modal
+  // Plan Dispatch & Manual entry modal
   const [showManual, setShowManual] = useState(false);
+  const [dispatchTab, setDispatchTab] = useState('plan'); // 'plan' | 'offline'
+  const [planDispatchSaving, setPlanDispatchSaving] = useState(false);
+  const [planDispatchError, setPlanDispatchError] = useState('');
+  const [dispatchNotice, setDispatchNotice] = useState('');
+  const [planDispatchForm, setPlanDispatchForm] = useState({
+    title: '',
+    subject: '',
+    hours: 0,
+    minutes: 25,
+    priority: 'medium',
+    time: new Date().toTimeString().slice(0, 5),
+    loadIntoDial: true
+  });
+
   const [manualSaving, setManualSaving] = useState(false);
   const [manualError, setManualError] = useState('');
   const [manual, setManual] = useState(() => {
@@ -179,6 +193,65 @@ export default function TimerPage() {
   const manualDurationSeconds =
     (Number(manual.hours) || 0) * 3600 + (Number(manual.minutes) || 0) * 60;
 
+  const handleSavePlanDispatch = async (e) => {
+    e.preventDefault();
+    if (!planDispatchForm.title.trim()) {
+      setPlanDispatchError('Please enter a task or sprint title.');
+      return;
+    }
+
+    setPlanDispatchSaving(true);
+    setPlanDispatchError('');
+    try {
+      const now = new Date();
+      const [hour, minute] = (planDispatchForm.time || '09:00').split(':').map(Number);
+      const dueDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0);
+      const totalMins = (Number(planDispatchForm.hours) || 0) * 60 + (Number(planDispatchForm.minutes) || 0) || 25;
+      const targetSubj = planDispatchForm.subject || subject || allSubjects[0];
+
+      await createTodo({
+        title: planDispatchForm.title.trim(),
+        description: `Subject: ${targetSubj}`,
+        dueDate: dueDate.toISOString(),
+        estimatedDuration: String(totalMins),
+        priority: planDispatchForm.priority || 'medium',
+        completed: false
+      });
+
+      if (planDispatchForm.loadIntoDial) {
+        setSubject(targetSubj);
+        setTask(planDispatchForm.title.trim());
+        setCustomHours(Number(planDispatchForm.hours) || 0);
+        setCustomMinutes(Number(planDispatchForm.minutes) || 25);
+        setCustomPomoFocus(totalMins);
+        if (totalMins === 25) {
+          setSetupMode(TIMER_MODES.POMODORO);
+          setSelectedPreset(0);
+        } else {
+          setSetupMode(TIMER_MODES.CUSTOM);
+        }
+      }
+
+      setDispatchNotice('Block dispatched to task ledger!');
+      setTimeout(() => setDispatchNotice(''), 3500);
+      setShowManual(false);
+      setPlanDispatchForm({
+        title: '',
+        subject: '',
+        hours: 0,
+        minutes: 25,
+        priority: 'medium',
+        time: new Date().toTimeString().slice(0, 5),
+        loadIntoDial: true
+      });
+    } catch (err) {
+      console.error('Failed to plan dispatch:', err);
+      setPlanDispatchError('Could not dispatch session. Please try again.');
+    } finally {
+      setPlanDispatchSaving(false);
+    }
+  };
+
   const handleSaveManual = async () => {
     if (manualDurationSeconds <= 0) {
       setManualError('Enter how long you studied.');
@@ -198,7 +271,7 @@ export default function TimerPage() {
       const path = learningPaths.find(p => p._id === manual.learningPathId);
 
       await createStudySession({
-        subject: manual.subject || 'General',
+        subject: manual.subject || subject || allSubjects[0],
         learningPathId: path?._id || null,
         moduleName: manual.moduleName,
         topicName: manual.topicName,
@@ -1029,53 +1102,225 @@ export default function TimerPage() {
         </div>
       )}
 
-      {/* Manual Entry Modal */}
+      {/* Floating Notice */}
+      {dispatchNotice && (
+        <div style={{ position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)', background: 'var(--color-text-primary)', color: '#FFFFFF', padding: '8px 16px', borderRadius: '4px', fontSize: '12px', fontFamily: 'var(--font-mono)', zIndex: 1100, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+          {dispatchNotice}
+        </div>
+      )}
+
+      {/* Plan Dispatch / Offline Modal */}
       {showManual && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)' }} onClick={() => setShowManual(false)}>
-          <div className="mx-card" style={{ width: '420px', padding: '24px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+          <div className="mx-card" style={{ width: '440px', padding: '24px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+            
+            {/* Modal Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--color-border)' }}>
               <div>
-                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)' }}>■ RETROSPECTIVE DISPATCH</span>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '2px 0 0 0' }}>Log Offline Session</h3>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', letterSpacing: '0.08em' }}>■ DISPATCH CONTROL</span>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '2px 0 0 0' }}>
+                  {dispatchTab === 'plan' ? 'Plan Focus Dispatch' : 'Log Offline Session'}
+                </h3>
               </div>
               <button onClick={() => setShowManual(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>HOURS</label>
-                  <input type="number" min="0" max="23" className="form-input" value={manual.hours} onChange={e => setManualField('hours', Number(e.target.value) || 0)} />
-                </div>
-                <div>
-                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>MINUTES</label>
-                  <input type="number" min="0" max="59" className="form-input" value={manual.minutes} onChange={e => setManualField('minutes', Number(e.target.value) || 0)} />
-                </div>
-              </div>
-
-              <div>
-                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>SUBJECT</label>
-                <select className="form-input" value={manual.subject} onChange={e => setManualField('subject', e.target.value)}>
-                  {allSubjects.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>TASK DESCRIPTION</label>
-                <input type="text" className="form-input" value={manual.task} onChange={e => setManualField('task', e.target.value)} placeholder="e.g. Distributed Consensus Paper Review" />
-              </div>
-
-              {manualError && (
-                <div style={{ color: 'var(--color-accent)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{manualError}</div>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setShowManual(false)} style={{ fontSize: '12px' }}>Cancel</button>
-                <button type="button" className="btn btn-primary" onClick={handleSaveManual} disabled={manualSaving} style={{ fontSize: '12px' }}>
-                  {manualSaving ? 'Saving...' : 'Commit Session'}
-                </button>
-              </div>
+            {/* Mode Switch Tabs */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', background: 'var(--color-bg-subtle)', padding: '3px', borderRadius: '4px', marginBottom: '16px', border: '1px solid var(--color-border)' }}>
+              <button
+                type="button"
+                onClick={() => setDispatchTab('plan')}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 600,
+                  border: 'none',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  background: dispatchTab === 'plan' ? 'var(--color-text-primary)' : 'transparent',
+                  color: dispatchTab === 'plan' ? '#FFFFFF' : 'var(--color-text-secondary)'
+                }}
+              >
+                Plan Dispatch
+              </button>
+              <button
+                type="button"
+                onClick={() => setDispatchTab('offline')}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 600,
+                  border: 'none',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  background: dispatchTab === 'offline' ? 'var(--color-text-primary)' : 'transparent',
+                  color: dispatchTab === 'offline' ? '#FFFFFF' : 'var(--color-text-secondary)'
+                }}
+              >
+                Log Offline
+              </button>
             </div>
+
+            {/* Tab 1: Plan Dispatch */}
+            {dispatchTab === 'plan' ? (
+              <form onSubmit={handleSavePlanDispatch} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Block Title / Mission</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    required 
+                    value={planDispatchForm.title} 
+                    onChange={e => setPlanDispatchForm({ ...planDispatchForm, title: e.target.value })} 
+                    placeholder="e.g. Red-Black Tree Balancing & Audit" 
+                    autoFocus
+                    style={{ fontSize: '12px' }}
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Subject / Domain Tag</label>
+                  <select 
+                    className="form-input" 
+                    value={planDispatchForm.subject || subject || allSubjects[0]} 
+                    onChange={e => setPlanDispatchForm({ ...planDispatchForm, subject: e.target.value })}
+                    style={{ fontSize: '12px', fontWeight: 600 }}
+                  >
+                    {allSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                {/* Priority Selector */}
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Priority Level</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                    {['low', 'medium', 'high'].map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPlanDispatchForm({ ...planDispatchForm, priority: p })}
+                        style={{
+                          padding: '6px 8px',
+                          fontSize: '11px',
+                          fontFamily: 'var(--font-mono)',
+                          fontWeight: 700,
+                          textTransform: 'uppercase',
+                          borderRadius: '3px',
+                          cursor: 'pointer',
+                          border: planDispatchForm.priority === p ? '1.5px solid var(--color-accent)' : '1px solid var(--color-border)',
+                          background: planDispatchForm.priority === p 
+                            ? (p === 'high' ? '#FEECE9' : p === 'medium' ? '#FFFBEB' : '#ECFDF5') 
+                            : 'var(--color-bg-subtle)',
+                          color: p === 'high' ? 'var(--color-accent-red, #DC2626)' : p === 'medium' ? '#B45309' : '#047857'
+                        }}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Target Duration</label>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <input 
+                        type="number" 
+                        min="0" 
+                        max="12" 
+                        className="form-input" 
+                        value={planDispatchForm.hours} 
+                        onChange={e => setPlanDispatchForm({ ...planDispatchForm, hours: Number(e.target.value) || 0 })} 
+                        style={{ fontSize: '12px', width: '50px', textAlign: 'center' }} 
+                      />
+                      <span style={{ alignSelf: 'center', fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>h</span>
+                      <input 
+                        type="number" 
+                        min="5" 
+                        max="59" 
+                        className="form-input" 
+                        value={planDispatchForm.minutes} 
+                        onChange={e => setPlanDispatchForm({ ...planDispatchForm, minutes: Number(e.target.value) || 0 })} 
+                        style={{ fontSize: '12px', width: '56px', textAlign: 'center' }} 
+                      />
+                      <span style={{ alignSelf: 'center', fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>m</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Start Time</label>
+                    <input 
+                      type="time" 
+                      className="form-input" 
+                      value={planDispatchForm.time} 
+                      onChange={e => setPlanDispatchForm({ ...planDispatchForm, time: e.target.value })} 
+                      style={{ fontSize: '12px' }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Option to load into active timer */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', marginTop: '2px' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={planDispatchForm.loadIntoDial} 
+                    onChange={e => setPlanDispatchForm({ ...planDispatchForm, loadIntoDial: e.target.checked })} 
+                  />
+                  <span>Load directly into focus dial now</span>
+                </label>
+
+                {planDispatchError && (
+                  <div style={{ color: 'var(--color-accent)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{planDispatchError}</div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowManual(false)} style={{ fontSize: '12px' }}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={planDispatchSaving} style={{ fontSize: '12px' }}>
+                    {planDispatchSaving ? 'Dispatching...' : 'Dispatch Block'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Tab 2: Offline Session Log */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>HOURS</label>
+                    <input type="number" min="0" max="23" className="form-input" value={manual.hours} onChange={e => setManualField('hours', Number(e.target.value) || 0)} />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>MINUTES</label>
+                    <input type="number" min="0" max="59" className="form-input" value={manual.minutes} onChange={e => setManualField('minutes', Number(e.target.value) || 0)} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>SUBJECT</label>
+                  <select className="form-input" value={manual.subject || subject || allSubjects[0]} onChange={e => setManualField('subject', e.target.value)}>
+                    {allSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)' }}>TASK DESCRIPTION</label>
+                  <input type="text" className="form-input" value={manual.task} onChange={e => setManualField('task', e.target.value)} placeholder="e.g. Distributed Consensus Paper Review" />
+                </div>
+
+                {manualError && (
+                  <div style={{ color: 'var(--color-accent)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{manualError}</div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowManual(false)} style={{ fontSize: '12px' }}>Cancel</button>
+                  <button type="button" className="btn btn-primary" onClick={handleSaveManual} disabled={manualSaving} style={{ fontSize: '12px' }}>
+                    {manualSaving ? 'Saving...' : 'Commit Session'}
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}

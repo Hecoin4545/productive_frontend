@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Check, ChevronRight, ChevronDown, Clock, CalendarDays } from 'lucide-react';
-import { updateTodo } from '../services/api.js';
+import { Check, ChevronRight, ChevronDown, Clock, Plus, X } from 'lucide-react';
+import { updateTodo, createTodo } from '../services/api.js';
 
 const COLLAPSED_LIMIT = 6;
 
@@ -32,6 +32,16 @@ export default function TodoOverview({ todos: initialTodos }) {
   const safeTodos = Array.isArray(initialTodos) ? initialTodos : [];
   const [todos, setTodos] = useState(safeTodos);
   const [showAll, setShowAll] = useState(false);
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  const [planForm, setPlanForm] = useState({
+    title: '',
+    subject: 'General Deep Work',
+    duration: '45',
+    priority: 'medium',
+    time: new Date().toTimeString().slice(0, 5)
+  });
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planError, setPlanError] = useState('');
 
   useEffect(() => {
     setTodos(Array.isArray(initialTodos) ? initialTodos : []);
@@ -58,6 +68,78 @@ export default function TodoOverview({ todos: initialTodos }) {
         updated[index] = todo;
         setTodos([...updated]);
       }
+    }
+  };
+
+  const handlePriorityCycle = async (index, e) => {
+    e.stopPropagation();
+    const todo = todos[index];
+    if (!todo) return;
+
+    const nextPriorityMap = { low: 'medium', medium: 'high', high: 'low' };
+    const currentPriority = (todo.priority || 'medium').toLowerCase();
+    const nextPriority = nextPriorityMap[currentPriority] || 'high';
+
+    const updated = [...todos];
+    updated[index] = { ...todo, priority: nextPriority };
+    setTodos(updated);
+
+    if (todo._id) {
+      try {
+        await updateTodo(todo._id, { priority: nextPriority });
+      } catch (err) {
+        console.error('Failed to cycle priority:', err);
+        updated[index] = todo;
+        setTodos([...updated]);
+      }
+    }
+  };
+
+  const handleSavePlanDispatch = async (e) => {
+    e.preventDefault();
+    if (!planForm.title.trim()) {
+      setPlanError('Please enter a task title.');
+      return;
+    }
+
+    setPlanSaving(true);
+    setPlanError('');
+
+    try {
+      const now = new Date();
+      const [hour, minute] = (planForm.time || '09:00').split(':').map(Number);
+      const dueDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0);
+
+      const payload = {
+        title: planForm.title.trim(),
+        description: `Subject: ${planForm.subject || 'Deep Work'}`,
+        dueDate: dueDate.toISOString(),
+        estimatedDuration: String(planForm.duration || '45'),
+        priority: planForm.priority || 'medium',
+        completed: false
+      };
+
+      const res = await createTodo(payload);
+      const newTodo = res?.data?.data || {
+        ...payload,
+        _id: `temp-${Date.now()}`,
+        category: planForm.subject
+      };
+
+      setTodos(prev => [newTodo, ...prev]);
+      setShowPlanModal(false);
+      setPlanForm({
+        title: '',
+        subject: 'General Deep Work',
+        duration: '45',
+        priority: 'medium',
+        time: new Date().toTimeString().slice(0, 5)
+      });
+    } catch (err) {
+      console.error('Failed to plan dispatch:', err);
+      setPlanError('Failed to dispatch task. Please try again.');
+    } finally {
+      setPlanSaving(false);
     }
   };
 
@@ -94,62 +176,83 @@ export default function TodoOverview({ todos: initialTodos }) {
           <span className="card-header-red-dot">■</span>
           <h3 className="card-title">CHRONOLOGICAL FLOW // TASK DISPATCH</h3>
         </div>
-        {hasHidden && (
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button
             type="button"
-            className="card-link-btn"
-            onClick={() => setShowAll(prev => !prev)}
+            className="btn btn-secondary"
+            onClick={() => setShowPlanModal(true)}
+            style={{ fontSize: '11px', padding: '3px 8px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '4px' }}
           >
-            <span>{showAll ? 'Collapse ledger' : `Audit all (${orderedTodos.length})`}</span>
-            {showAll ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            <Plus size={12} /> Plan Dispatch
           </button>
-        )}
+          {hasHidden && (
+            <button
+              type="button"
+              className="card-link-btn"
+              onClick={() => setShowAll(prev => !prev)}
+            >
+              <span>{showAll ? 'Collapse ledger' : `Audit all (${orderedTodos.length})`}</span>
+              {showAll ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="todo-list">
-        {displayTodos.map((todo) => (
-          <div
-            key={todo._id || todo.title}
-            className={`todo-item ${todo.completed ? 'completed' : ''}`}
-          >
-            <button
-              type="button"
-              className={`todo-checkbox ${todo.completed ? 'checked' : ''}`}
-              onClick={() => toggleTodo(todos.indexOf(todo))}
-              aria-label={todo.completed ? "Mark incomplete" : "Mark complete"}
+        {displayTodos.map((todo) => {
+          const rawPriority = (todo.priority || 'medium').toLowerCase();
+          const priority = ['low', 'medium', 'high'].includes(rawPriority) ? rawPriority : 'medium';
+          const originalIndex = todos.indexOf(todo);
+
+          return (
+            <div
+              key={todo._id || todo.title}
+              className={`todo-item ${todo.completed ? 'completed' : ''}`}
             >
-              {todo.completed && <Check size={12} />}
-            </button>
+              <button
+                type="button"
+                className={`todo-checkbox ${todo.completed ? 'checked' : ''}`}
+                onClick={() => toggleTodo(originalIndex)}
+                aria-label={todo.completed ? "Mark incomplete" : "Mark complete"}
+              >
+                {todo.completed && <Check size={12} />}
+              </button>
 
-            <div className="todo-info">
-              <div className="todo-title">{todo.title}</div>
-              <div className="todo-meta">
-                {todo.dueDate && (
-                  <span
-                    className="todo-when"
-                    title={`Scheduled ${new Date(todo.dueDate).toLocaleString()}`}
-                  >
-                    <Clock size={11} />
-                    <span>{formatDayLabel(new Date(todo.dueDate))}</span>
-                    {formatTimeLabel(todo) && (
-                      <span className="todo-time-badge">{formatTimeLabel(todo)}</span>
-                    )}
-                  </span>
-                )}
-                <span className="todo-tag">{todo.category || todo.learningPathName || 'Sprint Block'}</span>
-                {getDuration(todo) !== null && (
-                  <span className="todo-duration">{getDuration(todo)} min</span>
-                )}
+              <div className="todo-info">
+                <div className="todo-title">{todo.title}</div>
+                <div className="todo-meta">
+                  {todo.dueDate && (
+                    <span
+                      className="todo-when"
+                      title={`Scheduled ${new Date(todo.dueDate).toLocaleString()}`}
+                    >
+                      <Clock size={11} />
+                      <span>{formatDayLabel(new Date(todo.dueDate))}</span>
+                      {formatTimeLabel(todo) && (
+                        <span className="todo-time-badge">{formatTimeLabel(todo)}</span>
+                      )}
+                    </span>
+                  )}
+                  <span className="todo-tag">{todo.category || todo.learningPathName || 'Sprint Block'}</span>
+                  {getDuration(todo) !== null && (
+                    <span className="todo-duration">{getDuration(todo)} min</span>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {todo.priority && (
-              <span className={`todo-priority-badge ${todo.priority}`}>
-                {todo.priority.toUpperCase()}
+              <span 
+                className={`todo-priority-badge ${priority}`}
+                onClick={(e) => handlePriorityCycle(originalIndex, e)}
+                title={`Priority: ${priority.toUpperCase()} — Click to cycle (Low → Medium → High)`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handlePriorityCycle(originalIndex, e); }}
+              >
+                {priority.toUpperCase()}
               </span>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
 
         {orderedTodos.length === 0 && (
           <div className="todo-empty-state">
@@ -158,6 +261,118 @@ export default function TodoOverview({ todos: initialTodos }) {
           </div>
         )}
       </div>
+
+      {/* Plan Dispatch Modal */}
+      {showPlanModal && (
+        <div 
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20, 20, 19, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, backdropFilter: 'blur(2px)' }}
+          onClick={() => setShowPlanModal(false)}
+        >
+          <div className="mx-card" style={{ width: '420px', padding: '24px', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', letterSpacing: '0.08em' }}>■ DISPATCH LEDGER</span>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '2px 0 0 0' }}>Plan Task Dispatch</h3>
+              </div>
+              <button onClick={() => setShowPlanModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
+            </div>
+
+            <form onSubmit={handleSavePlanDispatch} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Task / Mission Title</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  required 
+                  value={planForm.title} 
+                  onChange={e => setPlanForm({ ...planForm, title: e.target.value })} 
+                  placeholder="e.g. Graph BFS & Topological Sort" 
+                  autoFocus
+                  style={{ fontSize: '12px' }}
+                />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Subject / Domain Tag</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={planForm.subject} 
+                  onChange={e => setPlanForm({ ...planForm, subject: e.target.value })} 
+                  placeholder="DSA, System Design, Backend..." 
+                  style={{ fontSize: '12px' }}
+                />
+              </div>
+
+              {/* Priority Selector */}
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Priority Level</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  {['low', 'medium', 'high'].map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPlanForm({ ...planForm, priority: p })}
+                      style={{
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        border: planForm.priority === p ? '1.5px solid var(--color-accent)' : '1px solid var(--color-border)',
+                        background: planForm.priority === p 
+                          ? (p === 'high' ? '#FEECE9' : p === 'medium' ? '#FFFBEB' : '#ECFDF5') 
+                          : 'var(--color-bg-subtle)',
+                        color: p === 'high' ? 'var(--color-accent-red, #DC2626)' : p === 'medium' ? '#B45309' : '#047857'
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Time</label>
+                  <input 
+                    type="time" 
+                    className="form-input" 
+                    value={planForm.time} 
+                    onChange={e => setPlanForm({ ...planForm, time: e.target.value })} 
+                    style={{ fontSize: '12px' }}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Duration (Mins)</label>
+                  <input 
+                    type="number" 
+                    min="5" 
+                    step="5" 
+                    className="form-input" 
+                    value={planForm.duration} 
+                    onChange={e => setPlanForm({ ...planForm, duration: e.target.value })} 
+                    style={{ fontSize: '12px' }}
+                  />
+                </div>
+              </div>
+
+              {planError && (
+                <div style={{ color: 'var(--color-accent)', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{planError}</div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowPlanModal(false)} style={{ fontSize: '12px' }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={planSaving} style={{ fontSize: '12px' }}>
+                  {planSaving ? 'Dispatching...' : 'Dispatch Task'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -61,7 +61,7 @@ export default function CalendarPage() {
 
   // Quick form for tasks
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [taskForm, setTaskForm] = useState({ title: '', subject: '', time: '09:00', duration: '60', date: toDateKey(new Date()) });
+  const [taskForm, setTaskForm] = useState({ title: '', subject: '', time: '09:00', duration: '60', date: toDateKey(new Date()), priority: 'medium' });
   const [editingId, setEditingId] = useState(null);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
@@ -140,7 +140,7 @@ export default function CalendarPage() {
     setShowTaskForm(false);
     setFormError('');
     setEditingId(null);
-    setTaskForm({ title: '', subject: '', time: '09:00', duration: '60', date: toDateKey(currentDate) });
+    setTaskForm({ title: '', subject: '', time: '09:00', duration: '60', date: toDateKey(currentDate), priority: 'medium' });
   };
 
   const handleToggleTaskCompletion = async (todo, e) => {
@@ -181,7 +181,7 @@ export default function CalendarPage() {
   const openTaskForm = (dateKey, time) => {
     setFormError('');
     setEditingId(null);
-    setTaskForm({ title: '', subject: '', time, duration: '60', date: dateKey });
+    setTaskForm({ title: '', subject: '', time, duration: '60', date: dateKey, priority: 'medium' });
     setShowTaskForm(true);
   };
 
@@ -195,7 +195,8 @@ export default function CalendarPage() {
       subject,
       time: `${`${due.getHours()}`.padStart(2, '0')}:${`${due.getMinutes()}`.padStart(2, '0')}`,
       duration: `${getDurationMinutes(todo)}`,
-      date: toDateKey(due)
+      date: toDateKey(due),
+      priority: todo.priority || 'medium'
     });
     setShowTaskForm(true);
   };
@@ -220,14 +221,13 @@ export default function CalendarPage() {
       description: `Subject: ${taskForm.subject || 'Deep Work'}`,
       dueDate: localDueDate.toISOString(),
       estimatedDuration: `${duration}`,
-      priority: 'medium',
+      priority: taskForm.priority || 'medium',
       completed: false
     };
 
     setSaving(true);
     try {
       if (editingId) {
-        delete payload.priority;
         delete payload.completed;
         await updateTodo(editingId, payload);
         setNotice('Session block updated.');
@@ -821,6 +821,35 @@ export default function CalendarPage() {
                   placeholder="System Design, LeetCode, ML..." 
                   style={{ fontFamily: 'var(--font-sans)', fontSize: '13px' }}
                 />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>Priority Level</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  {['low', 'medium', 'high'].map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setTaskForm({ ...taskForm, priority: p })}
+                      style={{
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        borderRadius: '3px',
+                        cursor: 'pointer',
+                        border: (taskForm.priority || 'medium') === p ? '1.5px solid var(--color-accent)' : '1px solid var(--color-border)',
+                        background: (taskForm.priority || 'medium') === p 
+                          ? (p === 'high' ? '#FEECE9' : p === 'medium' ? '#FFFBEB' : '#ECFDF5') 
+                          : 'var(--color-bg-subtle)',
+                        color: p === 'high' ? 'var(--color-accent-red, #DC2626)' : p === 'medium' ? '#B45309' : '#047857'
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>

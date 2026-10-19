@@ -1494,15 +1494,32 @@ img {
   font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 2px;
+  padding: 2px 6px;
+  border-radius: 3px;
   letter-spacing: 0.04em;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s ease);
+  user-select: none;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.todo-priority-badge:hover {
+  filter: brightness(0.95);
+  transform: translateY(-0.5px);
+  border-color: currentColor;
+}
+
+.todo-priority-badge:active {
+  transform: translateY(0);
 }
 
 .todo-priority-badge.high {
   background: #FEECE9;
-  color: var(--color-accent-red);
+  color: var(--color-accent-red, #E03E2D);
 }
 
 .todo-priority-badge.medium {
