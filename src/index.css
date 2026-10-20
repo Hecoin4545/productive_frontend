@@ -8675,6 +8675,135 @@ img {
   border: 1px solid rgba(220, 38, 38, 0.3);
 }
 
+.auth-success-banner {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-xs);
+  color: var(--color-success-text);
+  background: var(--color-success-light);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.4;
+}
+
+.auth-verify-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--color-bg-warm);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  font-size: var(--font-xs);
+  margin-bottom: var(--space-1);
+}
+
+.auth-target-email {
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.auth-change-email-btn {
+  background: none;
+  border: none;
+  color: var(--color-accent-orange);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: opacity var(--transition-fast);
+}
+
+.auth-change-email-btn:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.otp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: var(--space-2) 0;
+}
+
+.otp-boxes-container {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.otp-digit-box {
+  width: 48px;
+  height: 56px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.otp-digit-box:hover {
+  border-color: var(--color-text-secondary);
+}
+
+.otp-digit-box:focus {
+  border-color: var(--color-accent-black);
+  box-shadow: 0 0 0 3px rgba(20, 20, 19, 0.12);
+  transform: translateY(-1px);
+}
+
+.otp-digit-box.filled {
+  border-color: var(--color-accent-black);
+  background: var(--color-surface-hover);
+}
+
+.otp-resend-wrapper {
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
+.otp-countdown-text {
+  font-size: var(--font-xs);
+  color: var(--color-text-tertiary);
+}
+
+.otp-countdown-text strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.otp-resend-btn {
+  background: none;
+  border: none;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color var(--transition-fast);
+}
+
+.otp-resend-btn:hover:not(:disabled) {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+
+.otp-resend-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .auth-btn {
   width: 100%;
   padding: 12px;
@@ -8719,7 +8848,16 @@ img {
   .auth-card {
     padding: var(--space-5);
   }
+  .otp-boxes-container {
+    gap: 6px;
+  }
+  .otp-digit-box {
+    width: 40px;
+    height: 48px;
+    font-size: 20px;
+  }
 }
+
 
 /* ============================================================= */
 /* KNOWLEDGE VAULT — PREMIUM RESOURCES PAGE                      */

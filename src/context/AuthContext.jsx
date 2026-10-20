@@ -20,7 +20,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-     const res = await api.get('/auth/me');
+      const res = await api.get('/auth/me');
       if (res.data.success) {
         setUser(res.data.user);
       }
@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
         setUser(res.data.user);
         return true;
       }
-      } catch (err) {
+    } catch (err) {
       setUser(null);
       if (err.response) {
         setError(err.response.data?.message || 'Authentication failed');
@@ -52,10 +52,34 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (name, email, password) => {
+  const sendOtp = async (name, email, password) => {
     setError('');
     try {
-      const res = await api.post('/auth/register', { name, email, password });
+      const res = await api.post('/auth/send-otp', { name, email, password });
+      return { success: true, message: res.data?.message || 'Verification code sent' };
+    } catch (err) {
+      const message = err.response?.data?.message || (err.request ? 'Cannot reach the server' : 'Failed to send verification code');
+      setError(message);
+      return { success: false, message };
+    }
+  };
+
+  const resendOtp = async (email, name = '') => {
+    setError('');
+    try {
+      const res = await api.post('/auth/resend-otp', { email, name });
+      return { success: true, message: res.data?.message || 'New verification code sent' };
+    } catch (err) {
+      const message = err.response?.data?.message || (err.request ? 'Cannot reach the server' : 'Failed to resend verification code');
+      setError(message);
+      return { success: false, message };
+    }
+  };
+
+  const verifyAndRegister = async (name, email, password, otp) => {
+    setError('');
+    try {
+      const res = await api.post('/auth/register', { name, email, password, otp });
       if (res.data.success) {
         localStorage.setItem('arcstep_token', res.data.token);
         setUser(res.data.user);
@@ -63,15 +87,14 @@ export function AuthProvider({ children }) {
       }
       throw new Error(res.data?.message || 'Registration failed');
     } catch (err) {
-      if (err.response) {
-        setError(err.response.data?.message || 'Server error');
-      } else if (err.request) {
-        setError('Cannot reach the server. Check your connection.');
-      } else {
-        setError(err.message || 'Registration failed');
-      }
+      const message = err.response?.data?.message || (err.request ? 'Cannot reach the server. Check your connection.' : err.message || 'Registration failed');
+      setError(message);
       return false;
     }
+  };
+
+  const register = async (name, email, password, otp) => {
+    return verifyAndRegister(name, email, password, otp);
   };
 
   const logout = () => {
@@ -81,7 +104,20 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, error, setError, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        error,
+        setError,
+        login,
+        register,
+        sendOtp,
+        resendOtp,
+        verifyAndRegister,
+        logout
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
