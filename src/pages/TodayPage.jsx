@@ -169,10 +169,11 @@ export default function TodayPage() {
         <StudyChart weeklyData={d.weeklyStudy} />
       </div>
 
-      <div className="dashboard-grid">
-        {/* Left column: Learning Progress */}
-        <LearningProgress paths={learningPaths} />
-        {/* Right column: Goals */}
+      {/* Learning Progress & Goals - Learning Progress only comes when learning paths exist */}
+      <div className={learningPaths.length > 0 ? "dashboard-grid" : ""}>
+        {learningPaths.length > 0 && (
+          <LearningProgress paths={learningPaths} />
+        )}
         <GoalsOverview goals={d.goals} />
       </div>
     </div>

@@ -121,51 +121,35 @@ export default function Sidebar({ isCollapsed, onToggleCollapse }) {
           </NavLink>
         ))}
 
-        {/* Cognitive Focus / Subject meters */}
-        {!isCollapsed && (
+        {/* Cognitive Focus / Subject meters - only shown when learning paths exist */}
+        {!isCollapsed && paths.length > 0 && (
           <>
             <div className="sidebar-section-header" style={{ marginTop: '20px' }}>
               <span className="sidebar-section-label">COGNITIVE FOCUS</span>
             </div>
             <div className="sidebar-focus-list">
-              {paths.length > 0 ? (
-                paths.slice(0, 4).map((path, idx) => (
-                  <div
-                    key={path._id}
-                    className={`sidebar-focus-item ${idx === 0 ? 'highlighted' : ''}`}
-                    onClick={() => navigate(`/learning/${path._id}`)}
-                    title={`View ${path.title}`}
-                  >
-                    <div className="sidebar-focus-meta">
-                      <span className="sidebar-focus-title">{path.title}</span>
-                      <span className="sidebar-focus-pct">{path.progress || 0}%</span>
-                    </div>
-                    <div className="sidebar-focus-bar">
-                      <div
-                        className="sidebar-focus-fill"
-                        style={{
-                          width: `${Math.min(100, Math.max(8, path.progress || 0))}%`,
-                          backgroundColor: idx === 0 ? '#E03E2D' : '#141413'
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))
-              ) : (
+              {paths.slice(0, 4).map((path, idx) => (
                 <div
-                  className="sidebar-focus-item"
-                  onClick={() => navigate('/learning')}
-                  style={{ cursor: 'pointer' }}
+                  key={path._id}
+                  className={`sidebar-focus-item ${idx === 0 ? 'highlighted' : ''}`}
+                  onClick={() => navigate(`/learning/${path._id}`)}
+                  title={`View ${path.title}`}
                 >
                   <div className="sidebar-focus-meta">
-                    <span className="sidebar-focus-title">Engineering Core</span>
-                    <span className="sidebar-focus-pct">84%</span>
+                    <span className="sidebar-focus-title">{path.title}</span>
+                    <span className="sidebar-focus-pct">{path.progress || 0}%</span>
                   </div>
                   <div className="sidebar-focus-bar">
-                    <div className="sidebar-focus-fill" style={{ width: '84%', backgroundColor: '#E03E2D' }} />
+                    <div
+                      className="sidebar-focus-fill"
+                      style={{
+                        width: `${Math.min(100, Math.max(8, path.progress || 0))}%`,
+                        backgroundColor: idx === 0 ? '#E03E2D' : '#141413'
+                      }}
+                    />
                   </div>
                 </div>
-              )}
+              ))}
             </div>
           </>
         )}
