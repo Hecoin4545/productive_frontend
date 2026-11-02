@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTimer } from '../context/TimerContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import {
   Timer, Play, Pause, Square, RotateCcw, Clock,
   BookOpen, Target, Flame, TrendingUp, ChevronDown,
@@ -65,6 +66,7 @@ const getSubjectColor = (name) => {
 export default function TimerPage() {
   const location = useLocation();
   const timer = useTimer();
+  const { user, updateUser } = useAuth();
   const {
     timerState, mode, displaySeconds, isActive, isRunning, isPaused,
     isTimerComplete, isBreak, sessionConfig, pomodoroConfig, elapsed, targetDuration,
@@ -75,9 +77,17 @@ export default function TimerPage() {
   } = timer;
 
   // Setup state
-  const [subject, setSubject] = useState('');
+  const [subject, setSubject] = useState(() => {
+    return localStorage.getItem('arcstep_last_subject') || '';
+  });
   const [learningPaths, setLearningPaths] = useState([]);
-  const [customSubjects, setCustomSubjects] = useState([]);
+  const [customSubjects, setCustomSubjects] = useState(() => {
+    try {
+      const cached = localStorage.getItem('arcstep_custom_subjects');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
   const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [selectedPath, setSelectedPath] = useState(null);
@@ -220,6 +230,7 @@ export default function TimerPage() {
 
       if (planDispatchForm.loadIntoDial) {
         setSubject(targetSubj);
+        try { localStorage.setItem('arcstep_last_subject', targetSubj); } catch {}
         setTask(planDispatchForm.title.trim());
         setCustomHours(Number(planDispatchForm.hours) || 0);
         setCustomMinutes(Number(planDispatchForm.minutes) || 25);
@@ -312,8 +323,23 @@ export default function TimerPage() {
       
     getProfile()
       .then(res => {
-        if (res.data?.success && res.data.user.customSubjects) {
-          setCustomSubjects(res.data.user.customSubjects);
+        if (res.data?.success && Array.isArray(res.data.user?.customSubjects)) {
+          const backendSubjects = res.data.user.customSubjects;
+          setCustomSubjects(prev => {
+            const merged = [...new Set([...prev, ...backendSubjects])];
+            try {
+              localStorage.setItem('arcstep_custom_subjects', JSON.stringify(merged));
+            } catch (e) {
+              console.error('Failed to sync custom subjects to localStorage:', e);
+            }
+            if (merged.length > backendSubjects.length) {
+              updateProfile({ customSubjects: merged }).catch(() => {});
+            }
+            return merged;
+          });
+          if (updateUser) {
+            updateUser({ customSubjects: backendSubjects });
+          }
         }
       })
       .catch(() => {});
@@ -354,24 +380,68 @@ export default function TimerPage() {
     }
   }, [isActive, sessionConfig]);
 
+  const DEFAULT_SUBJECTS = ['DSA & Algorithms', 'Distributed Systems', 'System Design', 'General Deep Work'];
+
+  const allSubjects = useMemo(() => {
+    const list = [
+      ...DEFAULT_SUBJECTS,
+      ...customSubjects,
+      ...learningPaths.map(p => p.subject).filter(Boolean),
+      ...recentSessions.map(s => s.subject).filter(Boolean)
+    ].map(s => (typeof s === 'string' ? s.trim() : '')).filter(Boolean);
+    return [...new Set(list)];
+  }, [customSubjects, learningPaths, recentSessions]);
+
   const handleAddCustomSubject = async () => {
-    if (!newSubjectName.trim()) return;
-    const addedSubject = newSubjectName.trim();
-    const updatedSubjects = [...new Set([...customSubjects, addedSubject])];
+    const trimmed = newSubjectName.trim();
+    if (!trimmed) return;
+    const updatedSubjects = [...new Set([...customSubjects, trimmed])];
     
     setCustomSubjects(updatedSubjects);
-    setSubject(addedSubject);
+    setSubject(trimmed);
+    try {
+      localStorage.setItem('arcstep_custom_subjects', JSON.stringify(updatedSubjects));
+      localStorage.setItem('arcstep_last_subject', trimmed);
+    } catch (e) {
+      console.error('Failed to save subject to localStorage:', e);
+    }
     setNewSubjectName('');
     setIsAddingSubject(false);
     
     try {
-      await updateProfile({ customSubjects: updatedSubjects });
+      const res = await updateProfile({ customSubjects: updatedSubjects });
+      if (res.data?.success && Array.isArray(res.data.user?.customSubjects)) {
+        setCustomSubjects(res.data.user.customSubjects);
+        localStorage.setItem('arcstep_custom_subjects', JSON.stringify(res.data.user.customSubjects));
+      }
+      if (updateUser) {
+        updateUser({ customSubjects: updatedSubjects });
+      }
     } catch (err) {
       console.error('Failed to save custom subject:', err);
     }
   };
 
-  const allSubjects = customSubjects.length > 0 ? customSubjects : ['DSA & Algorithms', 'Distributed Systems', 'System Design', 'General Deep Work'];
+  const handleDeleteCustomSubject = async (subjToDelete) => {
+    const updatedSubjects = customSubjects.filter(s => s !== subjToDelete);
+    setCustomSubjects(updatedSubjects);
+    try {
+      localStorage.setItem('arcstep_custom_subjects', JSON.stringify(updatedSubjects));
+      if (subject === subjToDelete) {
+        const fallback = allSubjects.find(s => s !== subjToDelete) || DEFAULT_SUBJECTS[0];
+        setSubject(fallback);
+        localStorage.setItem('arcstep_last_subject', fallback);
+      }
+    } catch (e) {}
+    try {
+      await updateProfile({ customSubjects: updatedSubjects });
+      if (updateUser) {
+        updateUser({ customSubjects: updatedSubjects });
+      }
+    } catch (err) {
+      console.error('Failed to delete custom subject:', err);
+    }
+  };
 
   // ─── Actions ──────────────────────
   const handleStart = () => {
@@ -842,15 +912,27 @@ export default function TimerPage() {
                 <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
                   SUBJECT / TRACK
                 </label>
-                {!isAddingSubject && (
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingSubject(true)}
-                    style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}
-                  >
-                    <Plus size={12} /> Add Subject
-                  </button>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {customSubjects.includes(subject) && !isActive && !isAddingSubject && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCustomSubject(subject)}
+                      title="Remove this custom subject"
+                      style={{ background: 'none', border: 'none', color: 'var(--color-text-tertiary)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '2px' }}
+                    >
+                      <X size={11} /> Remove
+                    </button>
+                  )}
+                  {!isAddingSubject && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingSubject(true)}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px' }}
+                    >
+                      <Plus size={12} /> Add Subject
+                    </button>
+                  )}
+                </div>
               </div>
 
               {isAddingSubject ? (
@@ -889,7 +971,13 @@ export default function TimerPage() {
                 <select 
                   className="form-input" 
                   value={subject || allSubjects[0]} 
-                  onChange={e => setSubject(e.target.value)}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setSubject(val);
+                    try {
+                      localStorage.setItem('arcstep_last_subject', val);
+                    } catch (err) {}
+                  }}
                   style={{ fontSize: '12px', fontWeight: 600 }}
                   disabled={isActive}
                 >

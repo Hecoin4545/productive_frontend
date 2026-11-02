@@ -22,7 +22,13 @@ export default function LearningPage() {
   const navigate = useNavigate();
 
   const [paths, setPaths] = useState([]);
-  const [userSubjects, setUserSubjects] = useState([]);
+  const [userSubjects, setUserSubjects] = useState(() => {
+    try {
+      const cached = localStorage.getItem('arcstep_custom_subjects');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('all');
@@ -57,8 +63,12 @@ export default function LearningPage() {
     fetchPaths();
     getProfile()
       .then(res => {
-        if (res.data?.success && res.data.user?.customSubjects) {
-          setUserSubjects(res.data.user.customSubjects);
+        if (res.data?.success && Array.isArray(res.data.user?.customSubjects)) {
+          setUserSubjects(prev => {
+            const merged = [...new Set([...prev, ...res.data.user.customSubjects])];
+            try { localStorage.setItem('arcstep_custom_subjects', JSON.stringify(merged)); } catch {}
+            return merged;
+          });
         }
       })
       .catch(() => {});

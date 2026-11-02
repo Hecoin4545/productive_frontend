@@ -103,6 +103,10 @@ export function AuthProvider({ children }) {
     api.post('/auth/logout').catch(() => {});
   };
 
+  const updateUser = (updatedFields) => {
+    setUser(prev => (prev ? { ...prev, ...updatedFields } : prev));
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -115,6 +119,7 @@ export function AuthProvider({ children }) {
         sendOtp,
         resendOtp,
         verifyAndRegister,
+        updateUser,
         logout
       }}
     >
