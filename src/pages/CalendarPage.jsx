@@ -36,12 +36,16 @@ const getDurationMinutes = (todo) => {
   return Number.isFinite(mins) && mins > 0 ? mins : 60;
 };
 
-const getSessionStatus = (todo) => {
+const getSessionStatus = (todo, now = new Date()) => {
   if (todo.completed) return 'done';
   if (!todo.dueDate) return 'pending';
   const d = new Date(todo.dueDate);
   const endOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-  return Date.now() > endOfDay.getTime() ? 'missed' : 'pending';
+  // Strictly-before-today, so a block due today is still "pending" even if the
+  // clock has passed its start time. This lets you tick today's sessions off
+  // the same day they were scheduled.
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return endOfDay.getTime() < todayStart.getTime() ? 'missed' : 'pending';
 };
 
 const getSubjectTag = (desc) => {
@@ -500,7 +504,7 @@ export default function CalendarPage() {
                                   left: overlapCount > 1 ? `calc(${leftPct}% + 2px)` : '3px',
                                   width: overlapCount > 1 ? `calc(${widthPct}% - 4px)` : 'calc(100% - 6px)',
                                   zIndex: isSelected ? 25 : (10 + colIndexInOverlap),
-                                  borderLeftColor: todo.completed ? 'var(--color-success, #16A34A)' : 'var(--color-text-primary)'
+                                  borderLeftColor: todo.completed ? 'var(--color-success, #16A34A)' : (status === 'missed' ? '#DC2626' : 'var(--color-text-primary)')
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -511,22 +515,22 @@ export default function CalendarPage() {
                                   <span className="calendar-block-subject" style={{ margin: 0 }}>
                                     {getSubjectTag(todo.description)}
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => todo.completed ? handleToggleTaskCompletion(todo, e) : handleQuickDelete(todo, e)}
-                                    title={todo.completed ? 'Completed (click to unmark)' : 'Remove this block'}
-                                    style={{
-                                      background: 'none',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      padding: '0 2px',
-                                      fontSize: '11px',
-                                      fontWeight: 800,
-                                      color: todo.completed ? 'var(--color-success, #16A34A)' : '#DC2626'
-                                    }}
-                                  >
-                                    {todo.completed ? '✓' : '✕'}
-                                  </button>
+<button
+                                     type="button"
+                                     onClick={(e) => handleToggleTaskCompletion(todo, e)}
+                                     title={todo.completed ? 'Completed (click to unmark)' : 'Mark as completed'}
+                                     style={{
+                                       background: 'none',
+                                       border: 'none',
+                                       cursor: 'pointer',
+                                       padding: '0 2px',
+                                       fontSize: '11px',
+                                       fontWeight: 800,
+                                       color: todo.completed ? 'var(--color-success, #16A34A)' : 'var(--color-success, #16A34A)'
+                                     }}
+                                   >
+                                     {todo.completed ? '✓' : '✓'}
+                                   </button>
                                 </div>
                                 <div 
                                   className={`calendar-block-title ${todo.completed ? 'completed' : ''}`}
@@ -620,22 +624,22 @@ export default function CalendarPage() {
                               <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
                                 {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} ({getDurationMinutes(todo)}m)
                               </span>
-                              <button
-                                type="button"
-                                onClick={(e) => todo.completed ? handleToggleTaskCompletion(todo, e) : handleQuickDelete(todo, e)}
-                                title={todo.completed ? 'Completed (click to unmark)' : 'Remove this block'}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  padding: '0 4px',
-                                  fontSize: '12px',
-                                  fontWeight: 800,
-                                  color: todo.completed ? 'var(--color-success, #16A34A)' : '#DC2626'
-                                }}
-                              >
-                                {todo.completed ? '✓' : '✕'}
-                              </button>
+<button
+                                 type="button"
+                                 onClick={(e) => handleToggleTaskCompletion(todo, e)}
+                                 title={todo.completed ? 'Completed (click to unmark)' : 'Mark as completed'}
+                                 style={{
+                                   background: 'none',
+                                   border: 'none',
+                                   cursor: 'pointer',
+                                   padding: '0 4px',
+                                   fontSize: '12px',
+                                   fontWeight: 800,
+                                   color: 'var(--color-success, #16A34A)'
+                                 }}
+                               >
+                                 {todo.completed ? '✓' : '✓'}
+                               </button>
                             </div>
                           </div>
                           <div className={`calendar-block-title ${todo.completed ? 'completed' : ''}`} style={{ fontSize: '13px', marginTop: '2px', textDecoration: todo.completed ? 'line-through' : 'none', opacity: todo.completed ? 0.65 : 1 }}>
@@ -730,7 +734,7 @@ export default function CalendarPage() {
                                 color: t.completed ? 'var(--color-success, #16A34A)' : '#DC2626',
                                 cursor: 'pointer'
                               }}
-                              onClick={(e) => t.completed ? handleToggleTaskCompletion(t, e) : handleQuickDelete(t, e)}
+                              onClick={(e) => handleToggleTaskCompletion(t, e)}
                             >
                               {t.completed ? '✓' : '✕'}
                             </span>
