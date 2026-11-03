@@ -504,19 +504,14 @@ export default function CalendarPage() {
                                   left: overlapCount > 1 ? `calc(${leftPct}% + 2px)` : '3px',
                                   width: overlapCount > 1 ? `calc(${widthPct}% - 4px)` : 'calc(100% - 6px)',
                                   zIndex: isSelected ? 25 : (10 + colIndexInOverlap),
-                                  borderLeftColor: todo.completed ? 'var(--color-success, #16A34A)' : (status === 'missed' ? '#DC2626' : 'var(--color-text-primary)')
+                                  borderLeftColor: todo.completed ? 'var(--color-success, #16A34A)' : (getSessionStatus(todo) === 'missed' ? '#DC2626' : 'var(--color-text-primary)')
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openEditForm(todo);
                                 }}
-                              >
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
-                                  <span className="calendar-block-subject" style={{ margin: 0 }}>
-                                    {getSubjectTag(todo.description)}
-                                  </span>
-<button
-                                     type="button"
+                              ><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                                   <span className="calendar-block-subject" style={{ margin: 0 }}>
                                      onClick={(e) => handleToggleTaskCompletion(todo, e)}
                                      title={todo.completed ? 'Completed (click to unmark)' : 'Mark as completed'}
                                      style={{
@@ -624,9 +619,7 @@ export default function CalendarPage() {
                               <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
                                 {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} ({getDurationMinutes(todo)}m)
                               </span>
-<button
-                                 type="button"
-                                 onClick={(e) => handleToggleTaskCompletion(todo, e)}
+<buttononClick={(e) => handleToggleTaskCompletion(todo, e)}
                                  title={todo.completed ? 'Completed (click to unmark)' : 'Mark as completed'}
                                  style={{
                                    background: 'none',
@@ -832,9 +825,7 @@ export default function CalendarPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
                   {['low', 'medium', 'high'].map(p => (
                     <button
-                      key={p}
-                      type="button"
-                      onClick={() => setTaskForm({ ...taskForm, priority: p })}
+                      key={p}onClick={() => setTaskForm({ ...taskForm, priority: p })}
                       style={{
                         padding: '6px 8px',
                         fontSize: '11px',
@@ -904,17 +895,13 @@ export default function CalendarPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                 {editingId && (
                   <div style={{ marginRight: 'auto', display: 'flex', gap: '8px' }}>
-                    <button 
-                      type="button" 
-                      className="btn btn-secondary" 
+                    <buttonclassName="btn btn-secondary" 
                       style={{ color: 'var(--color-accent)', fontSize: '12px', padding: '6px 12px' }} 
                       onClick={() => handleDeleteTask(todos.find(t => t._id === editingId))}
                     >
                       <Trash2 size={13} /> Delete
                     </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
+                    <buttonclassName="btn btn-secondary"
                       style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                       onClick={() => {
                         const currentT = todos.find(t => t._id === editingId);
@@ -927,9 +914,7 @@ export default function CalendarPage() {
                     </button>
                   </div>
                 )}
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <buttonclassName="btn btn-secondary" 
                   style={{ fontSize: '12px', padding: '6px 14px' }} 
                   onClick={resetForm}
                 >
