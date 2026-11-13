@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createStudySession } from '../services/api.js';
 
 const TimerContext = createContext(null);
 
@@ -113,8 +114,26 @@ export function TimerProvider({ children }) {
   });
   const [isBreak, setIsBreak] = useState(false);
   const [accumulatedFocusSeconds, setAccumulatedFocusSeconds] = useState(0);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   const intervalRef = useRef(null);
+  const completeSoundRef = useRef(false);
+  const autoFinishedRef = useRef(false);
+
+  const sessionConfigRef = useRef(sessionConfig);
+  sessionConfigRef.current = sessionConfig;
+  const startTimestampRef = useRef(startTimestamp);
+  startTimestampRef.current = startTimestamp;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const targetDurationRef = useRef(targetDuration);
+  targetDurationRef.current = targetDuration;
+  const pomodoroConfigRef = useRef(pomodoroConfig);
+  pomodoroConfigRef.current = pomodoroConfig;
+  const pauseIntervalsRef = useRef(pauseIntervals);
+  pauseIntervalsRef.current = pauseIntervals;
+  const isBreakRef = useRef(isBreak);
+  isBreakRef.current = isBreak;
 
   // Restore timer state on mount
   useEffect(() => {
@@ -183,19 +202,79 @@ export function TimerProvider({ children }) {
   }, [startTimestamp, totalPausedDuration, timerState, pauseTimestamp]);
 
 
-  const handlePomodoroBreak = useCallback(() => {
-    setAccumulatedFocusSeconds(prev => prev + (Number(pomodoroConfig.focusMinutes) * 60));
-    setPomodoroConfig(prev => ({
-      ...prev,
-      completedBlocks: prev.completedBlocks + 1
-    }));
-    setIsBreak(true);
-    // Reset for break period
-    setStartTimestamp(Date.now());
+  const autoFinishTimer = useCallback(async () => {
+    if (autoFinishedRef.current) return;
+    autoFinishedRef.current = true;
+
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
+    if (!completeSoundRef.current) {
+      completeSoundRef.current = true;
+      completeSound();
+    }
+
+    const currentMode = modeRef.current;
+    const currentTarget = targetDurationRef.current;
+    const currentConfig = sessionConfigRef.current;
+    const currentStart = startTimestampRef.current;
+    const currentBreak = isBreakRef.current;
+    const currentPomoConfig = pomodoroConfigRef.current;
+    const currentPauseIntervals = pauseIntervalsRef.current;
+
+    // Reset timer state immediately so fullscreen popup closes automatically
+    setTimerState(TIMER_STATES.IDLE);
+    setStartTimestamp(null);
+    setPauseTimestamp(null);
     setTotalPausedDuration(0);
     setPauseIntervals([]);
-    setTargetDuration(Number(pomodoroConfig.breakMinutes) * 60);
-  }, [pomodoroConfig.focusMinutes, pomodoroConfig.breakMinutes]);
+    setElapsed(0);
+    setTargetDuration(0);
+    setIsBreak(false);
+    setAccumulatedFocusSeconds(0);
+    setSummaryOpen(false);
+    saveTimerState(null);
+
+    // If break period ended, don't log a study session
+    if (currentBreak) {
+      window.dispatchEvent(new CustomEvent('study-session-updated', {
+        detail: { action: 'break-ended' }
+      }));
+      return;
+    }
+
+    const durationSeconds = currentTarget > 0 ? currentTarget : 60;
+    const sessionToSave = {
+      subject: currentConfig?.subject || 'General',
+      learningPathId: currentConfig?.learningPathId || null,
+      moduleName: currentConfig?.moduleName || '',
+      topicName: currentConfig?.topicName || '',
+      topic: currentConfig?.topicName || currentConfig?.moduleName || currentConfig?.task || 'Deep Work Session',
+      task: currentConfig?.task || '',
+      startTime: currentStart ? new Date(currentStart).toISOString() : new Date().toISOString(),
+      endTime: new Date().toISOString(),
+      duration: durationSeconds,
+      mode: currentMode,
+      pomodoroConfig: currentMode === TIMER_MODES.POMODORO ? currentPomoConfig : undefined,
+      pauseIntervals: currentPauseIntervals,
+      notes: currentConfig?.task ? `Target completed: ${currentConfig.task}` : 'Focus target completed',
+      date: currentStart ? new Date(currentStart).toISOString() : new Date().toISOString(),
+      status: 'completed'
+    };
+
+    try {
+      await createStudySession(sessionToSave);
+    } catch (err) {
+      console.error('Failed to auto-save completed study session:', err);
+    }
+
+    // Broadcast update so all views (TodayPage, TimerPage, AnalyticsPage, etc.) update their stats & ledgers immediately
+    window.dispatchEvent(new CustomEvent('study-session-updated', {
+      detail: { action: 'auto-finished', duration: durationSeconds, session: sessionToSave }
+    }));
+  }, []);
 
   useEffect(() => {
     if (timerState === TIMER_STATES.RUNNING) {
@@ -207,15 +286,7 @@ export function TimerProvider({ children }) {
         if ((mode === TIMER_MODES.CUSTOM || mode === TIMER_MODES.POMODORO) && targetDuration > 0) {
           if (currentElapsed >= targetDuration) {
             setElapsed(targetDuration);
-            // Timer completed
-            if (!completeSoundRef.current) {
-              completeSoundRef.current = true;
-              completeSound();
-            }
-            if (mode === TIMER_MODES.POMODORO && !isBreak) {
-              // Switch to break
-              handlePomodoroBreak();
-            }
+            autoFinishTimer();
           }
         }
       };
@@ -229,7 +300,7 @@ export function TimerProvider({ children }) {
         intervalRef.current = null;
       }
     }
-  }, [timerState, calculateElapsed, mode, targetDuration, isBreak, handlePomodoroBreak]);
+  }, [timerState, calculateElapsed, mode, targetDuration, autoFinishTimer]);
 
   const startTimer = useCallback((config = {}) => {
     const now = Date.now();
@@ -241,6 +312,7 @@ export function TimerProvider({ children }) {
     setIsBreak(false);
     setAccumulatedFocusSeconds(0);
     completeSoundRef.current = false;
+    autoFinishedRef.current = false;
 
     if (config.subject !== undefined) {
       setSessionConfig({
@@ -337,7 +409,11 @@ export function TimerProvider({ children }) {
   }, [calculateElapsed, sessionConfig, startTimestamp, mode, pomodoroConfig, pauseIntervals, accumulatedFocusSeconds, isBreak]);
 
   const resetTimer = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    autoFinishedRef.current = false;
     setTimerState(TIMER_STATES.IDLE);
     setStartTimestamp(null);
     setPauseTimestamp(null);
@@ -347,7 +423,11 @@ export function TimerProvider({ children }) {
     setTargetDuration(0);
     setIsBreak(false);
     setAccumulatedFocusSeconds(0);
+    setSummaryOpen(false);
     saveTimerState(null);
+    window.dispatchEvent(new CustomEvent('study-session-updated', {
+      detail: { action: 'discarded' }
+    }));
   }, []);
 
   // Display value: for countdown, show remaining; for stopwatch, show elapsed
@@ -361,11 +441,6 @@ export function TimerProvider({ children }) {
   const isRunning = timerState === TIMER_STATES.RUNNING;
   const isPaused = timerState === TIMER_STATES.PAUSED;
   const isTimerComplete = (mode !== TIMER_MODES.STOPWATCH) && targetDuration > 0 && elapsed >= targetDuration;
-
-  // True while the post-session write-up is open. Kept here (not in TimerPage)
-  // so the layout can stay in fullscreen focus mode after the timer stops.
-  const [summaryOpen, setSummaryOpen] = useState(false);
-  const completeSoundRef = useRef(false);
 
   const value = {
     // State
@@ -393,6 +468,7 @@ export function TimerProvider({ children }) {
     resumeTimer,
     stopTimer,
     resetTimer,
+    autoFinishTimer,
     setMode,
     setTargetDuration,
     setSessionConfig,

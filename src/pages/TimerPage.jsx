@@ -6,11 +6,11 @@ import {
   Timer, Play, Pause, Square, RotateCcw, Clock,
   BookOpen, Target, Flame, TrendingUp, ChevronDown,
   X, CheckCircle2, AlertCircle, Coffee, Plus, Volume2, VolumeX,
-  FileText, ExternalLink, Sparkles, Check
+  FileText, ExternalLink, Sparkles, Check, Trash2
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import {
-  createStudySession, getStudySessions, getStudySessionStats, getLearningPaths,
+  createStudySession, deleteStudySession, getStudySessions, getStudySessionStats, getLearningPaths,
   getProfile, updateProfile, createTodo
 } from '../services/api.js';
 import '../index.css';
@@ -368,7 +368,29 @@ export default function TimerPage() {
     setLoadingHistory(false);
   }, [historyFilter]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { 
+    loadData(); 
+    const handleSync = () => loadData();
+    window.addEventListener('study-session-updated', handleSync);
+    return () => window.removeEventListener('study-session-updated', handleSync);
+  }, [loadData]);
+
+  const handleDeleteSession = async (sessionId, sessionName) => {
+    if (!sessionId) return;
+    const confirmMsg = `Remove this study session${sessionName ? ` ("${sessionName}")` : ''}? This will remove the recorded time from your total study hours everywhere.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await deleteStudySession(sessionId);
+      await loadData();
+      window.dispatchEvent(new CustomEvent('study-session-updated', { detail: { action: 'deleted', id: sessionId } }));
+      setDispatchNotice('Study session removed. Totals updated everywhere.');
+      setTimeout(() => setDispatchNotice(''), 3500);
+    } catch (err) {
+      console.error('Failed to delete study session:', err);
+      alert('Failed to remove session. Please try again.');
+    }
+  };
 
   // Sync setup state from active session
   useEffect(() => {
@@ -479,6 +501,54 @@ export default function TimerPage() {
     setSessionNotes('');
   };
 
+  const handleQuickSaveAndClose = async () => {
+    const result = stopTimer();
+    setSaving(true);
+    try {
+      const safeDuration = Number(result?.duration) || 0;
+      await createStudySession({
+        subject: result?.subject || subject || 'General',
+        learningPathId: result?.learningPathId || null,
+        moduleName: result?.moduleName || '',
+        topicName: result?.topicName || '',
+        topic: result?.topicName || result?.moduleName || result?.task || 'Deep Work Session',
+        task: result?.task || '',
+        startTime: result?.startTime || new Date().toISOString(),
+        endTime: result?.endTime || new Date().toISOString(),
+        duration: safeDuration,
+        mode: result?.mode || 'stopwatch',
+        pomodoroConfig: result?.pomodoroConfig || undefined,
+        pauseIntervals: result?.pauseIntervals || [],
+        notes: result?.task ? `Completed: ${result.task}` : 'Focus session completed',
+        date: result?.startTime || new Date().toISOString(),
+        status: 'completed'
+      });
+      setShowCompletion(false);
+      setSummaryOpen(false);
+      setCompletionData(null);
+      await loadData();
+      window.dispatchEvent(new CustomEvent('study-session-updated', { detail: { action: 'saved', duration: safeDuration } }));
+      setDispatchNotice(`Session completed & saved (+${formatDuration(safeDuration)})! Time updated everywhere.`);
+      setTimeout(() => setDispatchNotice(''), 3500);
+    } catch (err) {
+      console.error('Failed to save session:', err);
+      alert('Failed to save session. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDiscardAccidentalSession = () => {
+    if (window.confirm('Discard this active timer session? Use this if you turned on the timer by mistake. No time will be recorded.')) {
+      resetTimer();
+      setShowCompletion(false);
+      setSummaryOpen(false);
+      setCompletionData(null);
+      setDispatchNotice('Accidental session discarded. No time was logged.');
+      setTimeout(() => setDispatchNotice(''), 3500);
+    }
+  };
+
   const handleSaveSession = async () => {
     if (!completionData) return;
     setSaving(true);
@@ -506,7 +576,10 @@ export default function TimerPage() {
       setShowCompletion(false);
       setSummaryOpen(false);
       setCompletionData(null);
-      loadData();
+      await loadData();
+      window.dispatchEvent(new CustomEvent('study-session-updated', { detail: { action: 'saved', duration: safeDuration } }));
+      setDispatchNotice(`Session logged (+${formatDuration(safeDuration)})! Time updated everywhere.`);
+      setTimeout(() => setDispatchNotice(''), 3500);
     } catch (err) {
       console.error('Failed to save session:', err);
       alert('Failed to save session. Please try again.');
@@ -634,18 +707,30 @@ export default function TimerPage() {
 
           <button 
             className="btn btn-secondary" 
-            style={{ padding: '12px 24px', fontSize: '13px' }}
-            onClick={handleStop}
+            style={{ padding: '12px 22px', fontSize: '13px' }}
+            onClick={handleQuickSaveAndClose}
+            disabled={saving}
+            title="Finish, save session immediately, and exit popup"
           >
-            ■ Finish & Log Session
+            ■ Finish & Save Session
+          </button>
+
+          <button 
+            className="btn btn-secondary" 
+            style={{ padding: '12px 18px', fontSize: '13px' }}
+            onClick={handleStop}
+            title="Add notes, accomplishments, and log session"
+          >
+            <FileText size={14} /> Add Notes
           </button>
 
           <button 
             className="btn btn-secondary" 
             style={{ padding: '12px 18px', fontSize: '13px', color: 'var(--color-accent)' }}
-            onClick={resetTimer}
+            onClick={handleDiscardAccidentalSession}
+            title="Discard this session if started by mistake"
           >
-            <RotateCcw size={15} /> Discard
+            <Trash2 size={14} /> Discard Accidental
           </button>
         </div>
 
@@ -797,41 +882,54 @@ export default function TimerPage() {
                 <>
                   <button 
                     className="btn btn-primary" 
-                    style={{ padding: '10px 24px', fontSize: '12px' }}
+                    style={{ padding: '10px 20px', fontSize: '12px' }}
                     onClick={pauseTimer}
                   >
                     <Pause size={14} /> PAUSE FOCUS [SPACE]
                   </button>
                   <button 
                     className="btn btn-secondary" 
-                    style={{ padding: '10px 20px', fontSize: '12px' }}
-                    onClick={handleStop}
+                    style={{ padding: '10px 18px', fontSize: '12px' }}
+                    onClick={handleQuickSaveAndClose}
+                    disabled={saving}
+                    title="Finish and save immediately"
                   >
-                    ■ COMPLETE & LOG [⌘S]
+                    ■ COMPLETE & SAVE [⌘S]
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '10px 14px', fontSize: '12px', color: 'var(--color-accent)' }}
+                    onClick={handleDiscardAccidentalSession}
+                    title="Discard accidental session"
+                  >
+                    <Trash2 size={14} /> Discard
                   </button>
                 </>
               ) : (
                 <>
                   <button 
                     className="btn btn-primary" 
-                    style={{ padding: '10px 24px', fontSize: '12px' }}
+                    style={{ padding: '10px 20px', fontSize: '12px' }}
                     onClick={resumeTimer}
                   >
                     <Play size={14} /> RESUME FOCUS
                   </button>
                   <button 
                     className="btn btn-secondary" 
-                    style={{ padding: '10px 20px', fontSize: '12px' }}
-                    onClick={handleStop}
+                    style={{ padding: '10px 18px', fontSize: '12px' }}
+                    onClick={handleQuickSaveAndClose}
+                    disabled={saving}
+                    title="Finish and save immediately"
                   >
-                    ■ COMPLETE & LOG
+                    ■ COMPLETE & SAVE
                   </button>
                   <button 
                     className="btn btn-secondary" 
                     style={{ padding: '10px 14px', fontSize: '12px', color: 'var(--color-accent)' }}
-                    onClick={resetTimer}
+                    onClick={handleDiscardAccidentalSession}
+                    title="Discard accidental session"
                   >
-                    <RotateCcw size={14} /> Discard
+                    <Trash2 size={14} /> Discard
                   </button>
                 </>
               )}
@@ -859,8 +957,8 @@ export default function TimerPage() {
                 No recent study sessions logged today. Start a timer to create your first log!
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
-                {recentSessions.slice(0, 5).map((s, idx) => (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                {recentSessions.map((s, idx) => (
                   <div 
                     key={s._id || idx} 
                     style={{ 
@@ -870,20 +968,46 @@ export default function TimerPage() {
                       borderRadius: '3px',
                       display: 'flex',
                       justifyContent: 'space-between',
-                      alignItems: 'center'
+                      alignItems: 'center',
+                      gap: '8px'
                     }}
                   >
-                    <div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {s.task || s.topic || s.subject || 'Focus Session'}
                       </div>
                       <div style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
                         {s.subject || 'General'} · {s.startTime ? new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'}
                       </div>
                     </div>
-                    <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-accent)' }}>
-                      {formatDuration(s.duration)}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-accent)' }}>
+                        {formatDuration(s.duration)}
+                      </span>
+                      {s._id && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSession(s._id, s.task || s.topic || s.subject)}
+                          title="Remove session (e.g. if started by mistake)"
+                          aria-label="Remove this study session"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-text-tertiary)',
+                            cursor: 'pointer',
+                            padding: '3px 4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            borderRadius: '3px',
+                            transition: 'color 0.15s, background 0.15s'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#DC2626'; e.currentTarget.style.background = '#FEE2E2'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.background = 'none'; }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

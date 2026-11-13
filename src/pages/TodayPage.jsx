@@ -54,6 +54,9 @@ export default function TodayPage() {
 
   useEffect(() => {
     loadDashboard();
+    const handleSync = () => loadDashboard();
+    window.addEventListener('study-session-updated', handleSync);
+    return () => window.removeEventListener('study-session-updated', handleSync);
   }, []);
 
   const loadDashboard = async () => {
@@ -164,7 +167,7 @@ export default function TodayPage() {
 
       <div className="dashboard-grid">
         {/* Left column: Study Activity */}
-        <StudyActivity sessions={d.studySessions} />
+        <StudyActivity sessions={d.studySessions} onSessionDeleted={loadDashboard} />
         {/* Right column: Weekly Chart */}
         <StudyChart weeklyData={d.weeklyStudy} />
       </div>

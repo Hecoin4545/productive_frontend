@@ -511,7 +511,8 @@ export default function CalendarPage() {
                                   openEditForm(todo);
                                 }}
                               ><div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
-                                   <span className="calendar-block-subject" style={{ margin: 0 }}>
+                                   <button
+                                     type="button"
                                      onClick={(e) => handleToggleTaskCompletion(todo, e)}
                                      title={todo.completed ? 'Completed (click to unmark)' : 'Mark as completed'}
                                      style={{
@@ -619,7 +620,8 @@ export default function CalendarPage() {
                               <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--color-text-tertiary)' }}>
                                 {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} ({getDurationMinutes(todo)}m)
                               </span>
-<buttononClick={(e) => handleToggleTaskCompletion(todo, e)}
+                              <button
+                                onClick={(e) => handleToggleTaskCompletion(todo, e)}
                                  title={todo.completed ? 'Completed (click to unmark)' : 'Mark as completed'}
                                  style={{
                                    background: 'none',
@@ -895,13 +897,13 @@ export default function CalendarPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                 {editingId && (
                   <div style={{ marginRight: 'auto', display: 'flex', gap: '8px' }}>
-                    <buttonclassName="btn btn-secondary" 
+                    <button className="btn btn-secondary" 
                       style={{ color: 'var(--color-accent)', fontSize: '12px', padding: '6px 12px' }} 
                       onClick={() => handleDeleteTask(todos.find(t => t._id === editingId))}
                     >
                       <Trash2 size={13} /> Delete
                     </button>
-                    <buttonclassName="btn btn-secondary"
+                    <button className="btn btn-secondary"
                       style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
                       onClick={() => {
                         const currentT = todos.find(t => t._id === editingId);
@@ -914,7 +916,7 @@ export default function CalendarPage() {
                     </button>
                   </div>
                 )}
-                <buttonclassName="btn btn-secondary" 
+                <button className="btn btn-secondary" 
                   style={{ fontSize: '12px', padding: '6px 14px' }} 
                   onClick={resetForm}
                 >

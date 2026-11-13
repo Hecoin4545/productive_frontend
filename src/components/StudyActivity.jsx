@@ -1,3 +1,6 @@
+import { Trash2 } from 'lucide-react';
+import { deleteStudySession } from '../services/api.js';
+
 function formatTime(dateStr) {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
@@ -13,9 +16,24 @@ function formatDuration(minutes) {
   return `${h}h ${m}m`;
 }
 
-export default function StudyActivity({ sessions }) {
+export default function StudyActivity({ sessions, onSessionDeleted }) {
   const data = Array.isArray(sessions) ? sessions : [];
   const totalMinutes = data.reduce((sum, s) => sum + (s.duration || 0), 0);
+
+  const handleDelete = async (sessionId, topicName) => {
+    if (!sessionId) return;
+    const confirmMsg = `Remove this study session${topicName ? ` ("${topicName}")` : ''}? This will remove the recorded time from your daily study hours everywhere.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      await deleteStudySession(sessionId);
+      window.dispatchEvent(new CustomEvent('study-session-updated', { detail: { action: 'deleted', id: sessionId } }));
+      if (onSessionDeleted) onSessionDeleted(sessionId);
+    } catch (err) {
+      console.error('Failed to remove study session:', err);
+      alert('Could not remove session. Please try again.');
+    }
+  };
 
   return (
     <div className="card fade-in">
@@ -43,6 +61,7 @@ export default function StudyActivity({ sessions }) {
                   <th>FOCUS TOPIC</th>
                   <th>DURATION</th>
                   <th>STATUS</th>
+                  <th style={{ width: '40px', textAlign: 'center' }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -67,6 +86,31 @@ export default function StudyActivity({ sessions }) {
                     </td>
                     <td className="ledger-cell-status">
                       <span className="ledger-status-pill done">LOGGED</span>
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '4px' }}>
+                      {session._id && (
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(session._id, session.topic || session.subject)}
+                          title="Remove session (e.g. if turned on by mistake)"
+                          aria-label="Remove study session"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-text-tertiary)',
+                            cursor: 'pointer',
+                            padding: '4px 6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            borderRadius: '3px',
+                            transition: 'color 0.15s, background 0.15s'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#DC2626'; e.currentTarget.style.background = '#FEE2E2'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.background = 'none'; }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

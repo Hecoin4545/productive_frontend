@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useTimer } from '../context/TimerContext.jsx';
-import { Pause, Play, Timer, ExternalLink } from 'lucide-react';
+import { Pause, Play, Timer, ExternalLink, Trash2 } from 'lucide-react';
 
 function formatTime(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
@@ -12,7 +12,7 @@ function formatTime(totalSeconds) {
 }
 
 export default function GlobalTimerWidget() {
-  const { isActive, isRunning, isPaused, displaySeconds, sessionConfig, pauseTimer, resumeTimer } = useTimer();
+  const { isActive, isRunning, isPaused, displaySeconds, sessionConfig, pauseTimer, resumeTimer, resetTimer } = useTimer();
   const navigate = useNavigate();
 
   if (!isActive) return null;
@@ -54,6 +54,22 @@ export default function GlobalTimerWidget() {
           aria-label={isRunning ? 'Pause session' : 'Resume session'}
         >
           {isRunning ? <Pause size={13} /> : <Play size={13} />}
+        </button>
+
+        <button
+          type="button"
+          className="global-timer-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (window.confirm('Discard active study timer? This accidental session will not be saved.')) {
+              resetTimer();
+            }
+          }}
+          title="Discard accidental session"
+          aria-label="Discard accidental session"
+          style={{ color: 'var(--color-accent, #E03E2D)' }}
+        >
+          <Trash2 size={13} />
         </button>
 
         <span className="global-timer-open-hint">

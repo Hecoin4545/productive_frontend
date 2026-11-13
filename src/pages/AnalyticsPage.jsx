@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, CheckCircle, Download, ArrowUpRight, Award, Zap, Activity, Calendar, FileText } from 'lucide-react';
+import { Clock, CheckCircle, Download, ArrowUpRight, Award, Zap, Activity, Calendar, FileText, Trash2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import StatCard from '../components/StatCard.jsx';
 import {
@@ -12,7 +12,8 @@ import {
   getAnalyticsTodos,
   getAnalyticsHabits,
   getAnalyticsRecentActivity,
-  exportAnalytics
+  exportAnalytics,
+  deleteStudySession
 } from '../services/api';
 import '../index.css';
 
@@ -39,12 +40,10 @@ export default function AnalyticsPage() {
   const [habits, setHabits] = useState(null);
   const [activity, setActivity] = useState([]);
 
-  useEffect(() => {
-    let active = true;
+  const loadAnalytics = useCallback(() => {
     setLoading(true);
-
     const params = { period, subject };
-    Promise.all([
+    return Promise.all([
       getAnalyticsOverview(params),
       getAnalyticsStudyTime(params),
       getAnalyticsSubjects(params),
@@ -55,7 +54,6 @@ export default function AnalyticsPage() {
       getAnalyticsRecentActivity()
     ])
       .then(([o, st, sub, lp, tp, td, hb, ac]) => {
-        if (!active) return;
         if (o.data?.success) setOverview(o.data.data);
         if (st.data?.success) setStudyTime(st.data.data);
         if (sub.data?.success) setSubjects(sub.data.data);
@@ -66,10 +64,31 @@ export default function AnalyticsPage() {
         if (ac.data?.success) setActivity(Array.isArray(ac.data.data) ? ac.data.data : []);
       })
       .catch(err => console.error('Analytics load error:', err))
-      .finally(() => { if (active) setLoading(false); });
-
-    return () => { active = false; };
+      .finally(() => setLoading(false));
   }, [period, subject]);
+
+  useEffect(() => {
+    loadAnalytics();
+    const handleSync = () => loadAnalytics();
+    window.addEventListener('study-session-updated', handleSync);
+    return () => window.removeEventListener('study-session-updated', handleSync);
+  }, [loadAnalytics]);
+
+  const handleDeleteActivitySession = async (activityItem) => {
+    const rawId = activityItem.sessionId || (activityItem.id ? String(activityItem.id).replace('session_', '') : null);
+    if (!rawId) return;
+
+    if (!window.confirm(`Remove session "${activityItem.title}"? This will update your analytics and study time everywhere.`)) return;
+
+    try {
+      await deleteStudySession(rawId);
+      await loadAnalytics();
+      window.dispatchEvent(new CustomEvent('study-session-updated', { detail: { action: 'deleted', id: rawId } }));
+    } catch (err) {
+      console.error('Failed to delete session:', err);
+      alert('Could not remove session. Please try again.');
+    }
+  };
 
   const handleExport = useCallback(async (format) => {
     setExporting(true);
@@ -440,6 +459,7 @@ export default function AnalyticsPage() {
                   <th>SESSION / TOPIC</th>
                   <th style={{ width: '110px', textAlign: 'right' }}>DURATION</th>
                   <th style={{ width: '100px', textAlign: 'center' }}>STATUS</th>
+                  <th style={{ width: '40px', textAlign: 'center' }}></th>
                 </tr>
               </thead>
               <tbody>
@@ -470,6 +490,31 @@ export default function AnalyticsPage() {
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--color-success, #16A34A)', background: '#ECFDF5', border: '1px solid #BBF7D0', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
                         ✓ Logged
                       </span>
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '4px' }}>
+                      {a.type === 'session' && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteActivitySession(a)}
+                          title="Remove session (e.g. if started by mistake)"
+                          aria-label="Remove study session"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'var(--color-text-tertiary)',
+                            cursor: 'pointer',
+                            padding: '4px 6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            borderRadius: '3px',
+                            transition: 'color 0.15s, background 0.15s'
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = '#DC2626'; e.currentTarget.style.background = '#FEE2E2'; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; e.currentTarget.style.background = 'none'; }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
